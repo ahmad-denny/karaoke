@@ -164,6 +164,18 @@ body.tv-theater #tvHelp{display:none}
       <h2 class="section-title">Playlist &amp; Antrean</h2>
       <span class="tag" id="count">0 lagu</span>
     </div>
+    <div class="now" style="margin:0 0 12px">
+      <div>
+        <div class="muted" style="font-size:11px">SEDANG DIPUTAR</div>
+        <strong id="rNowTitle">Belum ada lagu</strong>
+      </div>
+    </div>
+    <div class="controls" style="margin-bottom:14px">
+      <button id="rPrev">⏮</button>
+      <button id="rPlay" class="primary">▶ Putar</button>
+      <button id="rStop" class="danger">■ Stop</button>
+      <button id="rNext">⏭</button>
+    </div>
     <div class="formrow">
       <input id="youtubeUrl" placeholder="Tempel URL YouTube atau ID video">
       <button class="primary" id="addBtn">＋ Tambah</button>
@@ -358,6 +370,11 @@ function render() {
   $('nowCategory').textContent = current
     ? (current.category === 'karaoke' ? 'Karaoke' : 'Non-karaoke')
     : '—';
+
+  $('rNowTitle').textContent = current
+    ? (current.title || 'YouTube ' + current.videoId)
+    : 'Belum ada lagu';
+  $('rPlay').textContent = state.isPlaying ? '⏸ Jeda' : '▶ Putar';
 
   $('playlist').innerHTML = '';
 
@@ -644,6 +661,24 @@ $('playBtn').onclick = () => {
 $('stopBtn').onclick = stopPlayback;
 $('nextBtn').onclick = next;
 $('prevBtn').onclick = previous;
+
+/* Kontrol dari HP (remote) */
+$('rStop').onclick = stopPlayback;
+$('rNext').onclick = next;
+$('rPrev').onclick = previous;
+$('rPlay').onclick = () => {
+  if (state.isPlaying) {
+    state.isPlaying = false;            // jeda
+  } else {
+    if (state.currentIndex < 0) {
+      if (!state.playlist.length) return;
+      state.currentIndex = 0;
+    }
+    state.isPlaying = true;             // lanjut / mulai
+  }
+  render();
+  save().catch(() => {});
+};
 
 /* Layar penuh asli (butuh interaksi langsung dari pengguna di TV) */
 function toggleFullscreen() {
