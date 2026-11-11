@@ -125,23 +125,84 @@ function extractId(raw) {
 
     return null;
 }
-function connect(room){
-  if(!validConfig()){ $('setupError').textContent='Konfigurasi Firebase belum diisi. Edit bagian firebaseConfig di file HTML terlebih dahulu.';return;}
-  try{
-    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
-    firebase.auth().signInAnonymously().then(()=>{
-      db=firebase.database(); roomRef=db.ref('karaokeRooms/'+room);
-      roomRef.on('value',snap=>{
-        applyingRemote=true; const v=snap.val();
-        state=v?{playlist:Array.isArray(v.playlist)?v.playlist:[],currentIndex:Number.isInteger(v.currentIndex)?v.currentIndex:-1,isPlaying:!!v.isPlaying}:{playlist:[],currentIndex:-1,isPlaying:false};
-        render(); syncPlayer(); applyingRemote=false;
-      });
-      $('setup').classList.add('hidden');$('app').classList.remove('hidden');
-      $('connection').textContent='● Terhubung • Ruang '+room;
-      $('roomInput').value=room;
-    }).catch(e=>$('setupError').textContent='Gagal masuk Firebase: '+e.message);
-  }catch(e){$('setupError').textContent=e.message;}
+
+async function connect(room) {
+    room = room.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
+    if (!room) {
+        $('setupError').textContent = 'Kode ruang wajib diisi.';
+        return;
+    }
+
+    if (!validConfig()) {
+        $('setupError').textContent = 'Konfigurasi Firebase tidak valid.';
+        return;
+    }
+
+    $('connection').textContent = 'Menghubungkan ke Firebase...';
+    $('setupError').textContent = '';
+
+    try {
+        // Inisialisasi Firebase satu kali
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        // Gunakan akun yang sudah login jika tersedia
+        if (!firebase.auth().currentUser) {
+            await firebase.auth().signInAnonymously();
+        }
+
+        db = firebase.database();
+        roomRef = db.ref('karaokeRooms/' + room);
+
+        // Dengarkan perubahan playlist
+        roomRef.off('value');
+
+        roomRef.on('value', snap => {
+            const v = snap.val();
+
+            state = v ? {
+                playlist: Array.isArray(v.playlist) ? v.playlist : [],
+                currentIndex: Number.isInteger(v.currentIndex)
+                    ? v.currentIndex : -1,
+                isPlaying: !!v.isPlaying
+            } : {
+                playlist: [],
+                currentIndex: -1,
+                isPlaying: false
+            };
+
+            render();
+
+            if (mode === 'tv') {
+                syncPlayer();
+            }
+
+            $('setup').classList.add('hidden');
+            $('app').classList.remove('hidden');
+            $('connection').textContent =
+                '● Terhubung • Ruang ' + room;
+
+        }, error => {
+            $('connection').textContent = 'Koneksi database gagal';
+            $('setupError').textContent =
+                'Database Error: ' + error.message;
+        });
+
+        $('roomInput').value = room;
+
+    } catch (error) {
+        $('connection').textContent = 'Gagal terhubung';
+
+        $('setupError').textContent =
+            'Firebase Error: ' +
+            error.code + ' - ' + error.message;
+
+        console.error('CONNECT ERROR:', error);
+    }
 }
+
 
 function save() {
     if (!roomRef) {
@@ -184,20 +245,23 @@ function render(){
     el.append(num,info,actions);$('playlist').append(el);
   });
 }
-function loadCurrent(autoplay) {
+
+function loadCurrent(autoplay = true) {
     if (mode !== 'tv') return;
+    if (!player || !ytReady) return;
 
-    const s = state.playlist[state.currentIndex];
+    const song = state.playlist[state.currentIndex];
 
-    if (!s || !player || !ytReady) return;
+    if (!song) return;
 
-    player.loadVideoById({
-        videoId: s.videoId
-    });
-
-    if (!autoplay) player.pauseVideo();
+    if (autoplay) {
+        player.loadVideoById(song.videoId);
+    } else {
+        player.cueVideoById(song.videoId);
+    }
 }
-function move(i,delta){const j=i+delta;if(j<0||j>=state.playlist.length)return;const a=[...state.playlist];[a[i],a[j]]=[a[j],a[i]];let ci=state.currentIndex;if(ci===i)ci=j;else if(ci===j)ci=i;state.playlist=a;state.currentIndex=ci;save();}
+
+  function move(i,delta){const j=i+delta;if(j<0||j>=state.playlist.length)return;const a=[...state.playlist];[a[i],a[j]]=[a[j],a[i]];let ci=state.currentIndex;if(ci===i)ci=j;else if(ci===j)ci=i;state.playlist=a;state.currentIndex=ci;save();}
 function remove(i){state.playlist.splice(i,1);if(i===state.currentIndex){state.currentIndex=-1;state.isPlaying=false;if(player&&player.stopVideo)player.stopVideo();}else if(i<state.currentIndex)state.currentIndex--;save();}
 
 function playIndex(i) {
@@ -218,44 +282,32 @@ function playIndex(i) {
 function next(){if(!state.playlist.length)return;playIndex((state.currentIndex+1+state.playlist.length)%state.playlist.length);}
 function previous(){if(!state.playlist.length)return;playIndex(Math.max(0,state.currentIndex-1));}
 
+
 function syncPlayer() {
-
-    console.log("MODE:", mode);
-    console.log("YT READY:", ytReady);
-    console.log("PLAYER:", player);
-    console.log("STATE:", state);
-
     if (mode !== 'tv') return;
     if (!player || !ytReady) return;
 
-    const s = state.playlist[state.currentIndex];
+    const song = state.playlist[state.currentIndex];
 
-    if (!s) return;
+    if (!song) {
+        player.stopVideo();
+        return;
+    }
 
-    console.log("VIDEO ID:", s.videoId);
+    const currentId = player.getVideoData()?.video_id;
 
-    player.loadVideoById({
-        videoId: s.videoId
-    });
-}
+    if (currentId !== song.videoId) {
+        loadCurrent(state.isPlaying);
+        return;
+    }
 
-function loadCurrent(autoplay) {
-
-    // Blokir pemutaran pada HP.
-    if (mode !== 'tv') return;
-
-    const s = state.playlist[state.currentIndex];
-
-    if (!s || !player || !ytReady) return;
-
-    player.loadVideoById({
-        videoId: s.videoId
-    });
-
-    if (!autoplay) {
+    if (state.isPlaying) {
+        player.playVideo();
+    } else {
         player.pauseVideo();
     }
 }
+
 
 
 window.onYouTubeIframeAPIReady = function() {
