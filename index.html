@@ -341,14 +341,59 @@ window.onYouTubeIframeAPIReady = function() {
 $('filters').onclick=e=>{if(!e.target.dataset.filter)return;filter=e.target.dataset.filter;document.querySelectorAll('.filters button').forEach(b=>b.classList.toggle('active',b===e.target));render();};
 $('clearBtn').onclick=()=>{if(confirm('Hapus seluruh playlist?')){state={playlist:[],currentIndex:-1,isPlaying:false};if(player)player.stopVideo();save();}};
 $('joinBtn').onclick = () => {
-    const r = $('roomInput').value.trim();
-
-    if (r) {
-        connect(
-            r.toLowerCase().replace(/[^a-z0-9_-]/g, '')
-        );
-    }
+  const r = $('roomInput').value.trim();
+  if (r) connect(r.toLowerCase().replace(/[^a-z0-9_-]/g, ''));
 };
+// TAMBAH LAGU KE PLAYLIST
+$('addBtn').onclick = async () => {
+  const url = $('youtubeUrl').value.trim();
+  const title = $('songTitle').value.trim();
+
+  if (!url) {
+    alert('Masukkan URL YouTube terlebih dahulu.');
+    return;
+  }
+
+  const videoId = extractId(url);
+
+  if (!videoId) {
+    alert('URL YouTube tidak valid.');
+    return;
+  }
+
+  if (!roomRef) {
+    alert('Belum terhubung ke ruang karaoke.');
+    return;
+  }
+
+  const song = {
+    id: Date.now().toString(),
+    videoId: videoId,
+    title: title || 'Lagu YouTube',
+    category: 'karaoke',
+    addedAt: Date.now()
+  };
+
+  try {
+    state.playlist.push(song);
+
+    await roomRef.set({
+      playlist: state.playlist,
+      currentIndex: state.currentIndex,
+      isPlaying: state.isPlaying
+    });
+
+    $('youtubeUrl').value = '';
+    $('songTitle').value = '';
+
+    render();
+
+  } catch (error) {
+    state.playlist.pop();
+    render();
+    alert('Gagal menambahkan lagu: ' + error.message);
+  }
+};  
 $('playBtn').onclick = () => {
 
     if (state.currentIndex < 0) {
