@@ -64,6 +64,7 @@ footer{text-align:center;color:#8491aa;font-size:11px;padding:15px}
 <button class="active" data-filter="all">Semua</button><button data-filter="karaoke">Karaoke</button><button data-filter="non-karaoke">Non-karaoke</button>
 </div>
 <div id="playlist"></div>
+<div id="player"></div>
 <div class="controls" style="margin-top:12px"><button id="clearBtn" class="danger">Hapus semua lagu</button></div>
 </section>
 </main>
@@ -310,32 +311,31 @@ function syncPlayer() {
 
 
 
-window.onYouTubeIframeAPIReady = function() {
-    // HP tidak boleh membuat YouTube Player
-    if (mode !== 'tv') return;
+window.onYouTubeIframeAPIReady = function () {
+  if (mode !== 'tv') return;
 
-    player = new YT.Player('ytplayer', {
-        width: '100%',
-        height: '100%',
-        videoId: '',
-        playerVars: {
-            autoplay: 0,
-            controls: 1,
-            rel: 0,
-            playsinline: 1
-        },
-        events: {
-            onReady: () => {
-                ytReady = true;
-                syncPlayer();
-            },
-            onStateChange: e => {
-                if (e.data === YT.PlayerState.ENDED) {
-                    next();
-                }
-            }
+  player = new YT.Player('player', {
+    height: '100%',
+    width: '100%',
+    videoId: '',
+    playerVars: {
+      autoplay: 1,
+      controls: 1,
+      playsinline: 1,
+      rel: 0
+    },
+    events: {
+      onReady: function () {
+        ytReady = true;
+        syncPlayer();
+      },
+      onStateChange: function (event) {
+        if (event.data === YT.PlayerState.ENDED) {
+          nextSong();
         }
-    });
+      }
+    }
+  });
 };
 
 $('filters').onclick=e=>{if(!e.target.dataset.filter)return;filter=e.target.dataset.filter;document.querySelectorAll('.filters button').forEach(b=>b.classList.toggle('active',b===e.target));render();};
