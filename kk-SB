@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karaoke YouTube Player</title>
+<style>
+:root{--bg:#0b1020;--panel:#151d32;--panel2:#1d2943;--text:#f5f7ff;--muted:#aab5cc;--accent:#9b7cff;--green:#32d296;--red:#ff647c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#090e1c,#111b32);color:var(--text);font:15px system-ui,Arial,sans-serif}
+header{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #ffffff18}
+h1{font-size:21px;margin:0} .sub{color:var(--muted);font-size:12px;margin-top:4px}
+main{max-width:1250px;margin:auto;padding:18px;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,1fr);gap:18px}
+.panel{background:#151d32eF;border:1px solid #ffffff18;border-radius:18px;padding:16px;box-shadow:0 12px 35px #0004}
+.player-wrap{aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}.player-wrap iframe{width:100%;height:100%;border:0}
+.now{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0}.now strong{font-size:17px}.muted{color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{border:0;border-radius:10px;padding:10px 13px;background:var(--panel2);color:white;font-weight:650;cursor:pointer}
+button.primary{background:var(--accent)}button.good{background:#167c5c}button.danger{background:#8e3045}button:disabled{opacity:.4;cursor:not-allowed}
+input,select{background:#0c1427;border:1px solid #34415d;color:white;border-radius:10px;padding:11px;min-width:0;width:100%}
+.formrow{display:grid;grid-template-columns:1fr 145px;gap:8px;margin:10px 0}
+.formrow2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.section-title{font-size:16px;font-weight:750;margin:0 0 12px}
+.queue-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.filters button{padding:7px 10px;font-size:12px}.filters .active{background:var(--accent)}
+.song{display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:9px;padding:10px;border-radius:12px;background:#0e172b;margin:7px 0;border:1px solid #ffffff0d}
+.song.current{border-color:var(--green);background:#12332f}
+.num{color:var(--muted);font-weight:800;text-align:center}.song-title{font-weight:700;overflow-wrap:anywhere}.song-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.song-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.song-actions button{padding:7px 9px;font-size:12px}
+.tag{font-size:10px;border-radius:20px;padding:3px 7px;background:#3a315d;color:#d9ceff}
+.status{font-size:12px;color:var(--muted);padding:8px 10px;background:#0c1427;border-radius:9px}
+.setup{max-width:850px;margin:22px auto;padding:18px}.setup p{color:var(--muted);line-height:1.55}.setup code{color:#d8caff}
+.hidden{display:none!important}
+footer{text-align:center;color:#8491aa;font-size:11px;padding:15px}
+@media(max-width:850px){main{grid-template-columns:1fr;padding:12px}.panel{padding:13px}header{padding:14px}.song{grid-template-columns:28px 1fr}.song-actions{grid-column:2;justify-content:flex-start}.formrow{grid-template-columns:1fr}.now{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header><div><h1>🎤 Karaoke YouTube Player</h1><div class="sub">Satu layar untuk bernyanyi, HP untuk mengatur playlist</div></div><div class="status" id="connection">Menghubungkan…</div></header>
+
+<section class="setup panel" id="setup">
+<h2>Pengaturan koneksi</h2>
+<p>Aplikasi ini memakai Firebase Realtime Database agar playlist TV dan HP tersinkronisasi. Isi konfigurasi Firebase satu kali pada bagian <code>firebaseConfig</code> di file HTML, lalu buka file yang sama dari alamat hosting yang sama di laptop dan HP.</p>
+<div class="formrow"><input id="roomInput" placeholder="Kode ruang, contoh: keluarga01"><button class="primary" id="joinBtn">Masuk ruang</button></div>
+<p><b>Mode:</b> tambahkan <code>?mode=tv</code> pada alamat untuk layar TV atau <code>?mode=remote</code> untuk tampilan remote HP. Keduanya dapat memakai kode ruang yang sama.</p>
+<div id="setupError" class="muted"></div>
+</section>
+
+<main id="app" class="hidden">
+<section class="panel" id="playerPanel">
+<div class="player-wrap"><div id="ytplayer"></div></div>
+<div class="now"><div><div class="muted" style="font-size:11px">SEDANG DIPUTAR</div><strong id="nowTitle">Belum ada lagu</strong></div><span class="tag" id="nowCategory">—</span></div>
+<div class="controls">
+<button id="prevBtn">⏮ Sebelumnya</button><button class="primary" id="playBtn">▶ Putar</button><button id="nextBtn">Berikutnya ⏭</button><button id="stopBtn">■ Stop</button>
+</div>
+<p class="muted" style="font-size:12px;margin-bottom:0">Tips: gunakan layar penuh (F11) pada laptop/TV. Pemutaran otomatis lagu berikutnya mengikuti antrean.</p>
+</section>
+
+<section class="panel" id="remotePanel">
+<div class="queue-head"><h2 class="section-title">Playlist & Antrean</h2><span class="tag" id="count">0 lagu</span></div>
+<div class="formrow"><input id="youtubeUrl" placeholder="Tempel URL YouTube atau ID video"><button class="primary" id="addBtn">＋ Tambah</button></div>
+<div class="formrow2"><input id="songName" placeholder="Judul lagu (opsional)"><select id="songCategory"><option value="karaoke">Karaoke</option><option value="non-karaoke">Non-karaoke</option></select></div>
+<div class="filters" id="filters">
+<button class="active" data-filter="all">Semua</button><button data-filter="karaoke">Karaoke</button><button data-filter="non-karaoke">Non-karaoke</button>
+</div>
+<div id="playlist"></div>
+<div class="controls" style="margin-top:12px"><button id="clearBtn" class="danger">Hapus semua lagu</button></div>
+</section>
+</main>
+<footer>Playlist disimpan dan dibagikan melalui Firebase Realtime Database • Gunakan hanya video yang tersedia untuk diputar di YouTube.</footer>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* LANGKAH 1: Ganti nilai di bawah dengan konfigurasi Firebase milik Anda. */
+const firebaseConfig = {
+  apiKey: "AIzaSyDQg-1Ga5mrBh1rXAdd94i1ajGQXuzksKE",
+  authDomain: "karaoke-family-sb.firebaseapp.com",
+  databaseURL: "https://karaoke-family-sb-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "karaoke-family-sb",
+  appId: "1:1069444133647:web:2b834eedc32c709b34447a"
+};
+
+let db, roomRef, player, state={playlist:[],currentIndex:-1,isPlaying:false};
+let filter='all', applyingRemote=false, ytReady=false;
+const $=id=>document.getElementById(id);
+const params=new URLSearchParams(location.search);
+const mode=params.get('mode')==='tv'?'tv':'remote';
+
+if(mode==='tv') $('remotePanel').classList.add('hidden');
+if(mode==='remote') $('playerPanel').classList.add('hidden');
+if(params.get('room')) $('roomInput').value=params.get('room');
+
+function validConfig() {
+    return (
+        firebaseConfig.apiKey &&
+        firebaseConfig.projectId &&
+        firebaseConfig.databaseURL.startsWith("https://")
+    );
+}
+function extractId(raw) {
+    const s = raw.trim();
+
+    if (/^[\w-]{11}$/.test(s)) return s;
+
+    try {
+        const u = new URL(s);
+
+        if (u.hostname.includes('youtu.be'))
+            return u.pathname.slice(1, 12);
+
+        if (u.hostname.includes('youtube.com')) {
+            if (u.searchParams.get('v'))
+                return u.searchParams.get('v');
+
+            const m = u.pathname.match(
+                /\/(?:embed|shorts)\/([\w-]{11})/
+            );
+
+            if (m) return m[1];
+        }
+    } catch (e) {}
+
+    return null;
+}
+function connect(room){
+  if(!validConfig()){ $('setupError').textContent='Konfigurasi Firebase belum diisi. Edit bagian firebaseConfig di file HTML terlebih dahulu.';return;}
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    firebase.auth().signInAnonymously().then(()=>{
+      db=firebase.database(); roomRef=db.ref('karaokeRooms/'+room);
+      roomRef.on('value',snap=>{
+        applyingRemote=true; const v=snap.val();
+        state=v?{playlist:Array.isArray(v.playlist)?v.playlist:[],currentIndex:Number.isInteger(v.currentIndex)?v.currentIndex:-1,isPlaying:!!v.isPlaying}:{playlist:[],currentIndex:-1,isPlaying:false};
+        render(); syncPlayer(); applyingRemote=false;
+      });
+      $('setup').classList.add('hidden');$('app').classList.remove('hidden');
+      $('connection').textContent='● Terhubung • Ruang '+room;
+      $('roomInput').value=room;
+    }).catch(e=>$('setupError').textContent='Gagal masuk Firebase: '+e.message);
+  }catch(e){$('setupError').textContent=e.message;}
+}
+
+function save() {
+    if (!roomRef) {
+        alert("Firebase belum terhubung!");
+        return;
+    }
+
+    roomRef.set(state)
+        .then(() => {
+            console.log("Playlist berhasil disimpan:", state);
+        })
+        .catch(error => {
+            console.error("Firebase Save Error:", error);
+
+            alert(
+                "Gagal menyimpan playlist!\n" +
+                error.code + "\n" +
+                error.message
+            );
+        });
+}
+
+function render(){
+  $('count').textContent=state.playlist.length+' lagu';
+  const current=state.playlist[state.currentIndex];
+  $('nowTitle').textContent=current?.title||'Belum ada lagu';
+  $('nowCategory').textContent=current?.category==='karaoke'?'Karaoke':current?'Non-karaoke':'—';
+  $('playlist').innerHTML='';
+  const shown=state.playlist.map((s,i)=>({...s,index:i})).filter(s=>filter==='all'||s.category===filter);
+  if(!shown.length){$('playlist').innerHTML ='<p class="muted">Belum ada lagu pada kategori ini.</p>';return;}
+  shown.forEach(s=>{
+    const el=document.createElement('div');el.className='song'+(s.index===state.currentIndex?' current':'');
+    const title=document.createElement('div');title.className='song-title';title.textContent=s.title||'YouTube '+s.videoId;
+    const meta=document.createElement('div');meta.className='song-meta';meta.textContent=s.category==='karaoke'?'Karaoke':'Non-karaoke';
+    const info=document.createElement('div');info.append(title,meta);
+    const num=document.createElement('div');num.className='num';num.textContent=s.index+1;
+    const actions=document.createElement('div');actions.className='song-actions';
+    const make=(label,fn,cls='')=>{const b=document.createElement('button');b.textContent=label;if(cls)b.className=cls;b.onclick=fn;return b};
+    actions.append(make('▶',()=>playIndex(s.index),'good'),make('↑',()=>move(s.index,-1)),make('↓',()=>move(s.index,1)),make('✕',()=>remove(s.index),'danger'));
+    el.append(num,info,actions);$('playlist').append(el);
+  });
+}
+function loadCurrent(autoplay) {
+    if (mode !== 'tv') return;
+
+    const s = state.playlist[state.currentIndex];
+
+    if (!s || !player || !ytReady) return;
+
+    player.loadVideoById({
+        videoId: s.videoId
+    });
+
+    if (!autoplay) player.pauseVideo();
+}
+function move(i,delta){const j=i+delta;if(j<0||j>=state.playlist.length)return;const a=[...state.playlist];[a[i],a[j]]=[a[j],a[i]];let ci=state.currentIndex;if(ci===i)ci=j;else if(ci===j)ci=i;state.playlist=a;state.currentIndex=ci;save();}
+function remove(i){state.playlist.splice(i,1);if(i===state.currentIndex){state.currentIndex=-1;state.isPlaying=false;if(player&&player.stopVideo)player.stopVideo();}else if(i<state.currentIndex)state.currentIndex--;save();}
+function playIndex(i){if(i<0||i>=state.playlist.length)return;state.currentIndex=i;state.isPlaying=true;save();loadCurrent(true);}
+function next(){if(!state.playlist.length)return;playIndex((state.currentIndex+1+state.playlist.length)%state.playlist.length);}
+function previous(){if(!state.playlist.length)return;playIndex(Math.max(0,state.currentIndex-1));}
+function syncPlayer(){if(!player||!ytReady)return;const s=state.playlist[state.currentIndex];if(!s){player.stopVideo();return;}const current=player.getVideoData?.().video_id;if(current!==s.videoId)loadCurrent(state.isPlaying);else if(state.isPlaying)player.playVideo();else player.pauseVideo();}
+function loadCurrent(autoplay){const s=state.playlist[state.currentIndex];if(!s||!player||!ytReady)return;player.loadVideoById({videoId:s.videoId});if(!autoplay)player.pauseVideo();}
+window.onYouTubeIframeAPIReady=function(){player=new YT.Player('ytplayer',{width:'100%',height:'100%',videoId:'',playerVars:{autoplay:0,controls:1,rel:0,playsinline:1},events:{onReady:()=>{ytReady=true;syncPlayer();},onStateChange:e=>{if(e.data===YT.PlayerState.ENDED)next();}}});};
+$('joinBtn').onclick=()=>{const r=$('roomInput').value.trim();if(r)connect(r.toLowerCase().replace(/[^a-z0-9_-]/g,''));};
+
+$('addBtn').onclick = () => {
+    const id = extractId($('youtubeUrl').value);
+
+    if (!id) {
+        alert('URL YouTube tidak valid!');
+        return;
+    }
+
+    const song = {
+        videoId: id,
+        title: $('songName').value.trim() || 'YouTube ' + id,
+        category: $('songCategory').value,
+        addedAt: Date.now()
+    };
+
+    state.playlist.push(song);
+
+    render();
+
+    save().then(() => {
+        $('youtubeUrl').value = '';
+        $('songName').value = '';
+    });
+};
+$('filters').onclick=e=>{if(!e.target.dataset.filter)return;filter=e.target.dataset.filter;document.querySelectorAll('.filters button').forEach(b=>b.classList.toggle('active',b===e.target));render();};
+$('clearBtn').onclick=()=>{if(confirm('Hapus seluruh playlist?')){state={playlist:[],currentIndex:-1,isPlaying:false};if(player)player.stopVideo();save();}};
+$('playBtn').onclick=()=>{if(state.currentIndex<0&&state.playlist.length)playIndex(0);else{state.isPlaying=true;save();if(player)player.playVideo();}};
+$('stopBtn').onclick=()=>{state.isPlaying=false;save();if(player)player.stopVideo();};
+$('nextBtn').onclick=next;$('prevBtn').onclick=previous;
+if(params.get('room'))connect(params.get('room'));
+</script>
+</body>
+</html>
