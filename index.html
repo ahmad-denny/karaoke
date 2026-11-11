@@ -288,7 +288,15 @@ window.onYouTubeIframeAPIReady = function() {
 
 $('filters').onclick=e=>{if(!e.target.dataset.filter)return;filter=e.target.dataset.filter;document.querySelectorAll('.filters button').forEach(b=>b.classList.toggle('active',b===e.target));render();};
 $('clearBtn').onclick=()=>{if(confirm('Hapus seluruh playlist?')){state={playlist:[],currentIndex:-1,isPlaying:false};if(player)player.stopVideo();save();}};
+$('joinBtn').onclick = () => {
+    const r = $('roomInput').value.trim();
 
+    if (r) {
+        connect(
+            r.toLowerCase().replace(/[^a-z0-9_-]/g, '')
+        );
+    }
+};
 $('playBtn').onclick = () => {
 
     if (state.currentIndex < 0) {
