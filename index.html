@@ -372,6 +372,36 @@ $('playBtn').onclick = () => {
 $('stopBtn').onclick=()=>{state.isPlaying=false;save();if(player)player.stopVideo();};
 $('nextBtn').onclick=next;$('prevBtn').onclick=previous;
 if(params.get('room'))connect(params.get('room'));
+
+
+$('addBtn').onclick = async () => {
+    const id = extractId($('youtubeUrl').value);
+
+    if (!id) {
+        alert('URL YouTube tidak valid!');
+        return;
+    }
+
+    const song = {
+        videoId: id,
+        title: $('songName').value.trim() || 'YouTube ' + id,
+        category: $('songCategory').value,
+        addedAt: Date.now()
+    };
+
+    state.playlist.push(song);
+
+    try {
+        await roomRef.set(state);
+
+        $('youtubeUrl').value = '';
+        $('songName').value = '';
+
+    } catch (error) {
+        alert('Gagal menambahkan lagu: ' + error.message);
+    }
+};
+  
 </script>
 </body>
 </html>
