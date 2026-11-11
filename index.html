@@ -220,38 +220,29 @@ function previous(){if(!state.playlist.length)return;playIndex(Math.max(0,state.
 
 function syncPlayer() {
 
-    if (mode !== 'tv') return;
+    console.log("MODE:", mode);
+    console.log("YT READY:", ytReady);
+    console.log("PLAYER:", player);
+    console.log("STATE:", state);
 
+    if (mode !== 'tv') return;
     if (!player || !ytReady) return;
 
     const s = state.playlist[state.currentIndex];
 
-    if (!s) {
-        player.stopVideo();
-        return;
-    }
+    if (!s) return;
 
-    const current = player.getVideoData()?.video_id;
+    console.log("VIDEO ID:", s.videoId);
 
-    if (current !== s.videoId) {
-
-        if (state.isPlaying) {
-            player.loadVideoById(s.videoId);
-        } else {
-            player.cueVideoById(s.videoId);
-        }
-
-    } else {
-
-        if (state.isPlaying) {
-            player.playVideo();
-        } else {
-            player.pauseVideo();
-        }
-    }
+    player.loadVideoById({
+        videoId: s.videoId
+    });
 }
 
-
+onError: (e) => {
+    console.error("YOUTUBE PLAYER ERROR:", e.data);
+    alert("YouTube Player Error: " + e.data);
+}
 function loadCurrent(autoplay) {
 
     // Blokir pemutaran pada HP.
