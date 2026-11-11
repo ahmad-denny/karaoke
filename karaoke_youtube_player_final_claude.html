@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karaoke YouTube Player</title>
+<style>
+:root{
+  --bg:#0b1020;--panel:#151d32;--panel2:#1d2943;
+  --text:#f5f7ff;--muted:#aab5cc;--accent:#9b7cff;
+  --green:#32d296;--red:#ff647c
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:linear-gradient(135deg,#090e1c,#111b32);
+  color:var(--text);font:15px system-ui,Arial,sans-serif
+}
+header{
+  padding:18px 22px;display:flex;align-items:center;
+  justify-content:space-between;gap:12px;border-bottom:1px solid #ffffff18
+}
+h1{font-size:21px;margin:0}
+.sub{color:var(--muted);font-size:12px;margin-top:4px}
+main{
+  max-width:1250px;margin:auto;padding:18px;
+  display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,1fr);gap:18px
+}
+.panel{
+  background:#151d32ef;border:1px solid #ffffff18;border-radius:18px;
+  padding:16px;box-shadow:0 12px 35px #0004;min-width:0
+}
+.player-wrap{
+  width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;
+  overflow:hidden;position:relative
+}
+#ytplayer{width:100%;height:100%;min-height:100%}
+#ytplayer iframe{width:100%;height:100%;border:0;display:block}
+.now{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:10px;margin:14px 0
+}
+.now strong{font-size:17px}
+.muted{color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{
+  border:0;border-radius:10px;padding:10px 13px;background:var(--panel2);
+  color:white;font-weight:650;cursor:pointer
+}
+button.primary{background:var(--accent)}
+button.good{background:#167c5c}
+button.danger{background:#8e3045}
+button:disabled{opacity:.4;cursor:not-allowed}
+input,select{
+  background:#0c1427;border:1px solid #34415d;color:white;
+  border-radius:10px;padding:11px;min-width:0;width:100%
+}
+.formrow{display:grid;grid-template-columns:1fr 145px;gap:8px;margin:10px 0}
+.formrow2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.section-title{font-size:16px;font-weight:750;margin:0 0 12px}
+.queue-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;margin-bottom:12px
+}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.filters button{padding:7px 10px;font-size:12px}
+.filters .active{background:var(--accent)}
+.song{
+  display:grid;grid-template-columns:38px 1fr auto;align-items:center;
+  gap:9px;padding:10px;border-radius:12px;background:#0e172b;
+  margin:7px 0;border:1px solid #ffffff0d
+}
+.song.current{border-color:var(--green);background:#12332f}
+.num{color:var(--muted);font-weight:800;text-align:center}
+.song-title{font-weight:700;overflow-wrap:anywhere}
+.song-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.song-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.song-actions button{padding:7px 9px;font-size:12px}
+.tag{font-size:10px;border-radius:20px;padding:3px 7px;background:#3a315d;color:#d9ceff}
+.status{font-size:12px;color:var(--muted);padding:8px 10px;background:#0c1427;border-radius:9px}
+.setup{max-width:850px;margin:22px auto;padding:18px}
+.setup p{color:var(--muted);line-height:1.55}
+.setup code{color:#d8caff}
+.hidden{display:none!important}
+footer{text-align:center;color:#8491aa;font-size:11px;padding:15px}
+#tvHelp{font-size:12px;line-height:1.5;color:var(--muted);margin-top:12px}
+
+/* Mode teater TV: video memenuhi layar saat lagu diputar */
+body.tv-theater header,
+body.tv-theater footer{display:none}
+body.tv-theater main{display:block;max-width:none;padding:0;margin:0}
+body.tv-theater #playerPanel{
+  position:fixed;inset:0;z-index:50;padding:0;margin:0;
+  border:0;border-radius:0;background:#000;box-shadow:none
+}
+body.tv-theater .player-wrap{
+  position:absolute;inset:0;aspect-ratio:auto;border-radius:0
+}
+body.tv-theater .now,
+body.tv-theater .controls,
+body.tv-theater #tvHelp{display:none}
+
+#fsBtn{
+  position:fixed;right:14px;bottom:14px;z-index:60;
+  opacity:.35;padding:10px 14px;font-size:18px
+}
+#fsBtn:hover{opacity:1}
+
+@media(max-width:850px){
+  main{grid-template-columns:1fr;padding:12px}
+  .panel{padding:13px}
+  header{padding:14px}
+  .song{grid-template-columns:28px 1fr}
+  .song-actions{grid-column:2;justify-content:flex-start}
+  .formrow{grid-template-columns:1fr}
+  .now{align-items:flex-start;flex-direction:column}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🎤 Karaoke YouTube Player</h1>
+    <div class="sub">Laptop / TV sebagai pemutar • HP sebagai remote playlist</div>
+  </div>
+  <div class="status" id="connection">Belum terhubung</div>
+</header>
+
+<section class="setup panel" id="setup">
+  <h2>Pengaturan koneksi</h2>
+  <p>Aplikasi memakai Firebase Realtime Database agar playlist laptop/TV dan HP tersinkronisasi. Gunakan file yang sama dari alamat hosting yang sama pada kedua perangkat.</p>
+  <div class="formrow">
+    <input id="roomInput" placeholder="Kode ruang, contoh: keluarga01">
+    <button class="primary" id="joinBtn">Masuk ruang</button>
+  </div>
+  <p><b>Alamat TV:</b> <code>?mode=tv&amp;room=keluarga01</code><br>
+     <b>Alamat HP:</b> <code>?mode=remote&amp;room=keluarga01</code></p>
+  <div id="setupError" class="muted"></div>
+</section>
+
+<main id="app" class="hidden">
+  <section class="panel" id="playerPanel">
+    <div class="player-wrap">
+      <!-- YouTube IFrame Player wajib memakai ID ytplayer -->
+      <div id="ytplayer"></div>
+    </div>
+    <div class="now">
+      <div>
+        <div class="muted" style="font-size:11px">SEDANG DIPUTAR</div>
+        <strong id="nowTitle">Belum ada lagu</strong>
+      </div>
+      <span class="tag" id="nowCategory">—</span>
+    </div>
+    <div class="controls">
+      <button id="prevBtn">⏮ Sebelumnya</button>
+      <button class="primary" id="playBtn">▶ Putar / Aktifkan Suara</button>
+      <button id="nextBtn">Berikutnya ⏭</button>
+      <button id="stopBtn">■ Stop</button>
+    </div>
+    <div id="tvHelp">Jika browser memblokir autoplay, klik tombol Putar / Aktifkan Suara satu kali pada laptop/TV. Klik di mana saja (atau tekan F) untuk layar penuh. Pastikan volume perangkat dan YouTube tidak dalam keadaan mute.</div>
+  </section>
+
+  <section class="panel" id="remotePanel">
+    <div class="queue-head">
+      <h2 class="section-title">Playlist &amp; Antrean</h2>
+      <span class="tag" id="count">0 lagu</span>
+    </div>
+    <div class="formrow">
+      <input id="youtubeUrl" placeholder="Tempel URL YouTube atau ID video">
+      <button class="primary" id="addBtn">＋ Tambah</button>
+    </div>
+    <div class="formrow2">
+      <input id="songName" placeholder="Judul lagu (opsional)">
+      <select id="songCategory">
+        <option value="karaoke">Karaoke</option>
+        <option value="non-karaoke">Non-karaoke</option>
+      </select>
+    </div>
+    <div class="filters" id="filters">
+      <button class="active" data-filter="all">Semua</button>
+      <button data-filter="karaoke">Karaoke</button>
+      <button data-filter="non-karaoke">Non-karaoke</button>
+    </div>
+    <div id="playlist"></div>
+    <div class="controls" style="margin-top:12px">
+      <button id="clearBtn" class="danger">Hapus semua lagu</button>
+    </div>
+  </section>
+</main>
+
+<button id="fsBtn" class="hidden" title="Layar penuh (F)">⛶</button>
+
+<footer>Playlist dibagikan melalui Firebase Realtime Database • Pemutaran video mengikuti ketersediaan dan kebijakan YouTube.</footer>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+/* Konfigurasi Firebase milik Anda */
+const firebaseConfig = {
+  apiKey: "AIzaSyDQg-1Ga5mrBh1rXAdd94i1ajGQXuzksKE",
+  authDomain: "karaoke-family-sb.firebaseapp.com",
+  databaseURL: "https://karaoke-family-sb-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "karaoke-family-sb",
+  appId: "1:1069444133647:web:2b834eedc32c709b34447a"
+};
+
+let db = null;
+let roomRef = null;
+let player = null;
+let ytReady = false;
+let filter = 'all';
+let state = { playlist: [], currentIndex: -1, isPlaying: false };
+let lastLoadedVideoId = null;
+
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const mode = params.get('mode') === 'tv' ? 'tv' : 'remote';
+
+if (mode === 'tv') {
+  $('remotePanel').classList.add('hidden');
+} else {
+  $('playerPanel').classList.add('hidden');
+}
+if (params.get('room')) $('roomInput').value = params.get('room');
+
+function validConfig() {
+  return !!(
+    firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    firebaseConfig.databaseURL.startsWith('https://')
+  );
+}
+
+function extractId(raw) {
+  const value = (raw || '').trim();
+  if (/^[\w-]{11}$/.test(value)) return value;
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '');
+
+    if (host === 'youtu.be') {
+      const id = url.pathname.split('/').filter(Boolean)[0];
+      return id && /^[\w-]{11}$/.test(id) ? id : null;
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      const v = url.searchParams.get('v');
+      if (v && /^[\w-]{11}$/.test(v)) return v;
+
+      const match = url.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]{11})/);
+      if (match) return match[1];
+    }
+  } catch (error) {
+    return null;
+  }
+  return null;
+}
+
+function showError(message) {
+  $('setupError').textContent = message;
+  console.error(message);
+}
+
+async function connect(room) {
+  room = (room || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  if (!room) {
+    showError('Kode ruang wajib diisi.');
+    return;
+  }
+  if (!validConfig()) {
+    showError('Konfigurasi Firebase tidak valid.');
+    return;
+  }
+
+  $('connection').textContent = 'Menghubungkan ke Firebase...';
+  $('setupError').textContent = '';
+
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+    if (!firebase.auth().currentUser) {
+      await firebase.auth().signInAnonymously();
+    }
+
+    db = firebase.database();
+    if (roomRef) roomRef.off();
+
+    roomRef = db.ref('karaokeRooms/' + room);
+    roomRef.on('value', snapshot => {
+      const data = snapshot.val();
+
+      state = data ? {
+        playlist: Array.isArray(data.playlist) ? data.playlist : [],
+        currentIndex: Number.isInteger(data.currentIndex) ? data.currentIndex : -1,
+        isPlaying: !!data.isPlaying
+      } : {
+        playlist: [],
+        currentIndex: -1,
+        isPlaying: false
+      };
+
+      // Lindungi currentIndex jika playlist berubah atau data tidak valid.
+      if (state.currentIndex < -1 || state.currentIndex >= state.playlist.length) {
+        state.currentIndex = -1;
+        state.isPlaying = false;
+      }
+
+      render();
+      if (mode === 'tv') syncPlayer();
+
+      $('setup').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      $('connection').textContent = '● Terhubung • Ruang ' + room;
+      $('roomInput').value = room;
+    }, error => {
+      $('connection').textContent = 'Koneksi database gagal';
+      showError('Database Error: ' + error.message);
+    });
+  } catch (error) {
+    $('connection').textContent = 'Gagal terhubung';
+    showError('Firebase Error: ' + (error.code || '') + ' ' + error.message);
+  }
+}
+
+function save() {
+  if (!roomRef) {
+    alert('Belum terhubung ke ruang karaoke.');
+    return Promise.reject(new Error('roomRef belum tersedia'));
+  }
+
+  return roomRef.set({
+    playlist: state.playlist,
+    currentIndex: state.currentIndex,
+    isPlaying: state.isPlaying
+  }).catch(error => {
+    console.error('Firebase Save Error:', error);
+    alert('Gagal menyimpan playlist: ' + error.message);
+    throw error;
+  });
+}
+
+function render() {
+  // Mode teater: di TV, saat lagu diputar tampilan otomatis memenuhi layar
+  if (mode === 'tv') {
+    document.body.classList.toggle(
+      'tv-theater',
+      state.isPlaying && state.currentIndex >= 0
+    );
+  }
+
+  $('count').textContent = state.playlist.length + ' lagu';
+
+  const current = state.playlist[state.currentIndex];
+  $('nowTitle').textContent = current ? (current.title || 'YouTube ' + current.videoId) : 'Belum ada lagu';
+  $('nowCategory').textContent = current
+    ? (current.category === 'karaoke' ? 'Karaoke' : 'Non-karaoke')
+    : '—';
+
+  $('playlist').innerHTML = '';
+
+  const shown = state.playlist
+    .map((song, index) => ({ ...song, index }))
+    .filter(song => filter === 'all' || song.category === filter);
+
+  if (!shown.length) {
+    $('playlist').innerHTML = '<p class="muted">Belum ada lagu pada kategori ini.</p>';
+    return;
+  }
+
+  shown.forEach(song => {
+    const item = document.createElement('div');
+    item.className = 'song' + (song.index === state.currentIndex ? ' current' : '');
+
+    const number = document.createElement('div');
+    number.className = 'num';
+    number.textContent = song.index + 1;
+
+    const info = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'song-title';
+    title.textContent = song.title || ('YouTube ' + song.videoId);
+
+    const meta = document.createElement('div');
+    meta.className = 'song-meta';
+    meta.textContent = song.category === 'karaoke' ? 'Karaoke' : 'Non-karaoke';
+    info.append(title, meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'song-actions';
+
+    const makeButton = (label, callback, className = '') => {
+      const button = document.createElement('button');
+      button.textContent = label;
+      if (className) button.className = className;
+      button.onclick = callback;
+      return button;
+    };
+
+    actions.append(
+      makeButton('▶', () => playIndex(song.index), 'good'),
+      makeButton('↑', () => moveSong(song.index, -1)),
+      makeButton('↓', () => moveSong(song.index, 1)),
+      makeButton('✕', () => removeSong(song.index), 'danger')
+    );
+
+    item.append(number, info, actions);
+    $('playlist').append(item);
+  });
+}
+
+function loadCurrent(autoplay = true) {
+  if (mode !== 'tv' || !player || !ytReady) return;
+
+  const song = state.playlist[state.currentIndex];
+  if (!song || !song.videoId) return;
+
+  lastLoadedVideoId = song.videoId;
+
+  if (autoplay) {
+    player.loadVideoById(song.videoId);
+  } else {
+    player.cueVideoById(song.videoId);
+  }
+}
+
+function syncPlayer() {
+  if (mode !== 'tv' || !player || !ytReady) return;
+
+  const song = state.playlist[state.currentIndex];
+
+  if (!song || !song.videoId) {
+    lastLoadedVideoId = null;
+    player.stopVideo();
+    return;
+  }
+
+  let currentVideoId = '';
+  try {
+    currentVideoId = player.getVideoData()?.video_id || '';
+  } catch (error) {}
+
+  if (currentVideoId !== song.videoId) {
+    loadCurrent(state.isPlaying);
+    return;
+  }
+
+  if (state.isPlaying) {
+    player.playVideo();
+  } else {
+    player.pauseVideo();
+  }
+}
+
+function playIndex(index) {
+  if (index < 0 || index >= state.playlist.length) return;
+
+  state.currentIndex = index;
+  state.isPlaying = true;
+  render();
+
+  save().then(() => {
+    if (mode === 'tv') syncPlayer();
+  }).catch(() => {});
+}
+
+function next() {
+  if (!state.playlist.length) return;
+  const nextIndex = state.currentIndex < 0
+    ? 0
+    : (state.currentIndex + 1) % state.playlist.length;
+  playIndex(nextIndex);
+}
+
+function previous() {
+  if (!state.playlist.length) return;
+  const previousIndex = state.currentIndex <= 0
+    ? 0
+    : state.currentIndex - 1;
+  playIndex(previousIndex);
+}
+
+async function moveSong(index, delta) {
+  const target = index + delta;
+  if (target < 0 || target >= state.playlist.length) return;
+
+  const playlist = [...state.playlist];
+  [playlist[index], playlist[target]] = [playlist[target], playlist[index]];
+
+  let currentIndex = state.currentIndex;
+  if (currentIndex === index) currentIndex = target;
+  else if (currentIndex === target) currentIndex = index;
+
+  state.playlist = playlist;
+  state.currentIndex = currentIndex;
+  render();
+  try { await save(); } catch (error) {}
+}
+
+async function removeSong(index) {
+  state.playlist.splice(index, 1);
+
+  if (index === state.currentIndex) {
+    state.currentIndex = -1;
+    state.isPlaying = false;
+    if (mode === 'tv' && player && ytReady) player.stopVideo();
+  } else if (index < state.currentIndex) {
+    state.currentIndex--;
+  }
+
+  render();
+  try { await save(); } catch (error) {}
+}
+
+async function addSong() {
+  const videoId = extractId($('youtubeUrl').value);
+  const title = $('songName').value.trim();
+  const category = $('songCategory').value;
+
+  if (!videoId) {
+    alert('URL atau ID video YouTube tidak valid. Pastikan link benar.');
+    return;
+  }
+  if (!roomRef) {
+    alert('Hubungkan ke ruang karaoke terlebih dahulu.');
+    return;
+  }
+
+  const song = {
+    id: Date.now().toString(),
+    videoId,
+    title: title || ('YouTube ' + videoId),
+    category,
+    addedAt: Date.now()
+  };
+
+  state.playlist.push(song);
+  render();
+
+  try {
+    await save();
+    $('youtubeUrl').value = '';
+    $('songName').value = '';
+  } catch (error) {
+    state.playlist.pop();
+    render();
+  }
+}
+
+function stopPlayback() {
+  state.isPlaying = false;
+  render();
+  save().catch(() => {});
+  if (mode === 'tv' && player && ytReady) player.stopVideo();
+}
+
+function clearPlaylist() {
+  if (!confirm('Hapus seluruh playlist?')) return;
+  state = { playlist: [], currentIndex: -1, isPlaying: false };
+  render();
+  if (mode === 'tv' && player && ytReady) player.stopVideo();
+  save().catch(() => {});
+}
+
+/* Callback resmi dari YouTube IFrame API */
+window.onYouTubeIframeAPIReady = function () {
+  if (mode !== 'tv') return;
+
+  const playerElement = $('ytplayer');
+  if (!playerElement) {
+    console.error('Elemen #ytplayer tidak ditemukan di halaman TV.');
+    return;
+  }
+
+  player = new YT.Player('ytplayer', {
+    width: '100%',
+    height: '100%',
+    videoId: '',
+    playerVars: {
+      autoplay: 0,
+      controls: 1,
+      playsinline: 1,
+      rel: 0
+    },
+    events: {
+      onReady: function () {
+        ytReady = true;
+        console.log('YouTube Player siap pada mode TV.');
+        syncPlayer();
+      },
+      onStateChange: function (event) {
+        if (event.data === YT.PlayerState.ENDED) next();
+      },
+      onError: function (event) {
+        console.error('YouTube Player error code:', event.data);
+        $('connection').textContent = 'Error YouTube: ' + event.data;
+      }
+    }
+  });
+};
+
+/* Event tombol dan filter */
+$('joinBtn').onclick = () => connect($('roomInput').value);
+$('addBtn').onclick = addSong;
+$('youtubeUrl').addEventListener('keydown', event => {
+  if (event.key === 'Enter') addSong();
+});
+
+$('filters').onclick = event => {
+  const selected = event.target.dataset.filter;
+  if (!selected) return;
+  filter = selected;
+  document.querySelectorAll('.filters button').forEach(button => {
+    button.classList.toggle('active', button.dataset.filter === filter);
+  });
+  render();
+};
+
+$('clearBtn').onclick = clearPlaylist;
+
+$('playBtn').onclick = () => {
+  if (state.currentIndex < 0) {
+    if (!state.playlist.length) {
+      alert('Playlist masih kosong. Tambahkan lagu dari HP terlebih dahulu.');
+      return;
+    }
+    state.currentIndex = 0;
+  }
+
+  state.isPlaying = true;
+  render();
+
+  // Panggil pemutar langsung dari klik pengguna di laptop/TV
+  if (mode === 'tv' && player && ytReady) {
+    syncPlayer();
+  }
+  if (mode === 'tv') document.documentElement.requestFullscreen?.().catch(() => {});
+
+  save().catch(() => {});
+};
+
+$('stopBtn').onclick = stopPlayback;
+$('nextBtn').onclick = next;
+$('prevBtn').onclick = previous;
+
+/* Layar penuh asli (butuh interaksi langsung dari pengguna di TV) */
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  }
+}
+
+if (mode === 'tv') {
+  $('fsBtn').classList.remove('hidden');
+  $('fsBtn').onclick = toggleFullscreen;
+  document.addEventListener('keydown', e => {
+    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+  });
+  // Klik pertama di mana saja (selain iframe) langsung masuk fullscreen
+  document.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  }, { once: true });
+}
+
+if (params.get('room')) connect(params.get('room'));
+</script>
+</body>
+</html>
