@@ -199,62 +199,129 @@ function loadCurrent(autoplay) {
 }
 function move(i,delta){const j=i+delta;if(j<0||j>=state.playlist.length)return;const a=[...state.playlist];[a[i],a[j]]=[a[j],a[i]];let ci=state.currentIndex;if(ci===i)ci=j;else if(ci===j)ci=i;state.playlist=a;state.currentIndex=ci;save();}
 function remove(i){state.playlist.splice(i,1);if(i===state.currentIndex){state.currentIndex=-1;state.isPlaying=false;if(player&&player.stopVideo)player.stopVideo();}else if(i<state.currentIndex)state.currentIndex--;save();}
-function playIndex(i){if(i<0||i>=state.playlist.length)return;state.currentIndex=i;state.isPlaying=true;save();loadCurrent(true);}
+
+function playIndex(i) {
+    if (i < 0 || i >= state.playlist.length) return;
+
+    state.currentIndex = i;
+    state.isPlaying = true;
+
+    // Kirim perintah ke Firebase.
+    save();
+
+    // Hanya TV yang menjalankan video.
+    if (mode === 'tv') {
+        loadCurrent(true);
+    }
+}
+
 function next(){if(!state.playlist.length)return;playIndex((state.currentIndex+1+state.playlist.length)%state.playlist.length);}
 function previous(){if(!state.playlist.length)return;playIndex(Math.max(0,state.currentIndex-1));}
-function syncPlayer(){if(!player||!ytReady)return;const s=state.playlist[state.currentIndex];if(!s){player.stopVideo();return;}const current=player.getVideoData?.().video_id;if(current!==s.videoId)loadCurrent(state.isPlaying);else if(state.isPlaying)player.playVideo();else player.pauseVideo();}
-function loadCurrent(autoplay){const s=state.playlist[state.currentIndex];if(!s||!player||!ytReady)return;player.loadVideoById({videoId:s.videoId});if(!autoplay)player.pauseVideo();}
-window.onYouTubeIframeAPIReady=function(){
-    player=new YT.Player('ytplayer',{
-        width:'100%',
-        height:'100%',
-        videoId:'',
-        playerVars:{
-            autoplay:0,
-            controls:1,
-            rel:0,
-            playsinline:1
+
+function syncPlayer() {
+
+    if (mode !== 'tv') return;
+
+    if (!player || !ytReady) return;
+
+    const s = state.playlist[state.currentIndex];
+
+    if (!s) {
+        player.stopVideo();
+        return;
+    }
+
+    const current = player.getVideoData()?.video_id;
+
+    if (current !== s.videoId) {
+
+        if (state.isPlaying) {
+            player.loadVideoById(s.videoId);
+        } else {
+            player.cueVideoById(s.videoId);
+        }
+
+    } else {
+
+        if (state.isPlaying) {
+            player.playVideo();
+        } else {
+            player.pauseVideo();
+        }
+    }
+}
+
+
+function loadCurrent(autoplay) {
+
+    // Blokir pemutaran pada HP.
+    if (mode !== 'tv') return;
+
+    const s = state.playlist[state.currentIndex];
+
+    if (!s || !player || !ytReady) return;
+
+    player.loadVideoById({
+        videoId: s.videoId
+    });
+
+    if (!autoplay) {
+        player.pauseVideo();
+    }
+}
+
+
+window.onYouTubeIframeAPIReady = function() {
+    // HP tidak boleh membuat YouTube Player
+    if (mode !== 'tv') return;
+
+    player = new YT.Player('ytplayer', {
+        width: '100%',
+        height: '100%',
+        videoId: '',
+        playerVars: {
+            autoplay: 0,
+            controls: 1,
+            rel: 0,
+            playsinline: 1
         },
-        events:{
-            onReady:()=>{
-                ytReady=true;
+        events: {
+            onReady: () => {
+                ytReady = true;
                 syncPlayer();
             },
-            onStateChange:e=>{
-                if(e.data===YT.PlayerState.ENDED)next();
+            onStateChange: e => {
+                if (e.data === YT.PlayerState.ENDED) {
+                    next();
+                }
             }
         }
     });
 };
-$('joinBtn').onclick=()=>{const r=$('roomInput').value.trim();if(r)connect(r.toLowerCase().replace(/[^a-z0-9_-]/g,''));};
 
-$('addBtn').onclick = () => {
-    const id = extractId($('youtubeUrl').value);
-
-    if (!id) {
-        alert('URL YouTube tidak valid!');
-        return;
-    }
-
-    const song = {
-        videoId: id,
-        title: $('songName').value.trim() || 'YouTube ' + id,
-        category: $('songCategory').value,
-        addedAt: Date.now()
-    };
-
-    state.playlist.push(song);
-
-    render();
-
-    save().then(() => {
-        $('youtubeUrl').value = '';
-        $('songName').value = '';
-    });
-};
 $('filters').onclick=e=>{if(!e.target.dataset.filter)return;filter=e.target.dataset.filter;document.querySelectorAll('.filters button').forEach(b=>b.classList.toggle('active',b===e.target));render();};
 $('clearBtn').onclick=()=>{if(confirm('Hapus seluruh playlist?')){state={playlist:[],currentIndex:-1,isPlaying:false};if(player)player.stopVideo();save();}};
-$('playBtn').onclick=()=>{if(state.currentIndex<0&&state.playlist.length)playIndex(0);else{state.isPlaying=true;save();if(player)player.playVideo();}};
+
+$('playBtn').onclick = () => {
+
+    if (state.currentIndex < 0) {
+        if (state.playlist.length > 0) {
+            state.currentIndex = 0;
+        } else {
+            return;
+        }
+    }
+
+    state.isPlaying = true;
+
+    save();
+
+    // Jangan memutar video di HP.
+    if (mode === 'tv' && player) {
+        syncPlayer();
+    }
+};
+
 $('stopBtn').onclick=()=>{state.isPlaying=false;save();if(player)player.stopVideo();};
 $('nextBtn').onclick=next;$('prevBtn').onclick=previous;
 if(params.get('room'))connect(params.get('room'));
