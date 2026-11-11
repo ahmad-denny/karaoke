@@ -322,6 +322,7 @@ async function connect(room) {
 
       render();
       if (mode === 'tv') syncPlayer();
+      if (mode === 'remote') fixTitles();
 
       $('setup').classList.add('hidden');
       $('app').classList.remove('hidden');
@@ -531,9 +532,50 @@ async function removeSong(index) {
   try { await save(); } catch (error) {}
 }
 
+/* Ambil judul asli video dari YouTube (oEmbed, tanpa API key) */
+async function fetchTitle(videoId) {
+  try {
+    const url = 'https://www.youtube.com/oembed?format=json&url=' +
+      encodeURIComponent('https://www.youtube.com/watch?v=' + videoId);
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.title || '').trim() || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Perbaiki lagu lama yang judulnya masih berupa kode video */
+let fixingTitles = false;
+const failedTitles = new Set();
+async function fixTitles() {
+  if (fixingTitles) return;
+  const pending = state.playlist.filter(s =>
+    s.videoId && !failedTitles.has(s.id) &&
+    (!s.title || s.title === 'YouTube ' + s.videoId)
+  );
+  if (!pending.length) return;
+
+  fixingTitles = true;
+  let changed = false;
+  for (const s of pending) {
+    const t = await fetchTitle(s.videoId);
+    if (!t) { failedTitles.add(s.id); continue; }
+    const target = state.playlist.find(x => x.id === s.id);
+    if (target) { target.title = t; changed = true; }
+  }
+  fixingTitles = false;
+
+  if (changed) {
+    render();
+    try { await save(); } catch (error) {}
+  }
+}
+
 async function addSong() {
   const videoId = extractId($('youtubeUrl').value);
-  const title = $('songName').value.trim();
+  let title = $('songName').value.trim();
   const category = $('songCategory').value;
 
   if (!videoId) {
@@ -543,6 +585,14 @@ async function addSong() {
   if (!roomRef) {
     alert('Hubungkan ke ruang karaoke terlebih dahulu.');
     return;
+  }
+
+  if (!title) {
+    $('addBtn').disabled = true;
+    $('addBtn').textContent = 'Mencari judul...';
+    title = (await fetchTitle(videoId)) || '';
+    $('addBtn').disabled = false;
+    $('addBtn').textContent = '＋ Tambah';
   }
 
   const song = {
