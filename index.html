@@ -84,6 +84,23 @@ input,select{
 footer{text-align:center;color:#8491aa;font-size:11px;padding:15px}
 #tvHelp{font-size:12px;line-height:1.5;color:var(--muted);margin-top:12px}
 
+/* Hasil pencarian YouTube saat mengetik */
+.suggest-wrap{position:relative;min-width:0}
+#suggestions{
+  position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;
+  background:#0c1427;border:1px solid #34415d;border-radius:12px;
+  max-height:60vh;overflow:auto;box-shadow:0 12px 30px #000a
+}
+.sg-item{
+  display:grid;grid-template-columns:96px 1fr;gap:10px;padding:8px;
+  cursor:pointer;align-items:center
+}
+.sg-item:hover{background:#1d2943}
+.sg-item img{width:96px;height:54px;object-fit:cover;border-radius:8px;background:#000}
+.sg-title{font-weight:700;font-size:13px;overflow-wrap:anywhere}
+.sg-chan{font-size:11px;color:var(--muted);margin-top:2px}
+.sg-note{padding:12px;font-size:12px;color:var(--muted)}
+
 /* Mode teater TV: video memenuhi layar saat lagu diputar */
 body.tv-theater header,
 body.tv-theater footer{display:none}
@@ -177,7 +194,10 @@ body.tv-theater #tvHelp{display:none}
       <button id="rNext">⏭</button>
     </div>
     <div class="formrow">
-      <input id="youtubeUrl" placeholder="Tempel URL YouTube atau ID video">
+      <div class="suggest-wrap">
+        <input id="youtubeUrl" placeholder="Ketik judul lagu, atau tempel URL / ID video" autocomplete="off">
+        <div id="suggestions" class="hidden"></div>
+      </div>
       <button class="primary" id="addBtn">＋ Tambah</button>
     </div>
     <div class="formrow2">
@@ -579,7 +599,9 @@ async function addSong() {
   const category = $('songCategory').value;
 
   if (!videoId) {
-    alert('URL atau ID video YouTube tidak valid. Pastikan link benar.');
+    const q = $('youtubeUrl').value.trim();
+    if (q.length >= 3) { runSearch(q); return; }
+    alert('Ketik judul lagu atau tempel URL / ID video YouTube yang valid.');
     return;
   }
   if (!roomRef) {
@@ -711,6 +733,142 @@ $('playBtn').onclick = () => {
 $('stopBtn').onclick = stopPlayback;
 $('nextBtn').onclick = next;
 $('prevBtn').onclick = previous;
+
+/* Pencarian YouTube (YouTube Data API v3).
+   Isi YT_API_KEY dengan API key milik Anda (lihat petunjuk). */
+const YT_API_KEY = '';
+
+let suggestTimer = null;
+let suggestSeq = 0;
+const suggestCache = new Map();
+
+function decodeHtml(text) {
+  const el = document.createElement('textarea');
+  el.innerHTML = text;
+  return el.value;
+}
+
+function hideSuggest() {
+  $('suggestions').classList.add('hidden');
+}
+
+function showSuggestNote(message) {
+  const box = $('suggestions');
+  box.innerHTML = '';
+  const note = document.createElement('div');
+  note.className = 'sg-note';
+  note.textContent = message;
+  box.append(note);
+  box.classList.remove('hidden');
+}
+
+async function searchYouTube(q) {
+  // Untuk kategori karaoke, otomatis cari versi karaokenya
+  const query = $('songCategory').value === 'karaoke' ? q + ' karaoke' : q;
+  const key = query.toLowerCase();
+  if (suggestCache.has(key)) return suggestCache.get(key);
+
+  const url = 'https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams({
+    part: 'snippet',
+    type: 'video',
+    maxResults: '8',
+    videoEmbeddable: 'true',
+    videoSyndicated: 'true',
+    q: query,
+    key: YT_API_KEY
+  });
+
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || ('HTTP ' + res.status));
+
+  const items = (data.items || [])
+    .filter(item => item.id && item.id.videoId)
+    .map(item => ({
+      videoId: item.id.videoId,
+      title: decodeHtml(item.snippet.title),
+      channel: decodeHtml(item.snippet.channelTitle),
+      thumb: (item.snippet.thumbnails && item.snippet.thumbnails.default)
+        ? item.snippet.thumbnails.default.url : ''
+    }));
+
+  suggestCache.set(key, items);
+  return items;
+}
+
+function renderSuggestions(items) {
+  const box = $('suggestions');
+  if (!items.length) {
+    showSuggestNote('Tidak ada hasil.');
+    return;
+  }
+  box.innerHTML = '';
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'sg-item';
+
+    const img = document.createElement('img');
+    img.src = item.thumb;
+    img.alt = '';
+    img.loading = 'lazy';
+
+    const text = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'sg-title';
+    title.textContent = item.title;
+    const chan = document.createElement('div');
+    chan.className = 'sg-chan';
+    chan.textContent = item.channel;
+    text.append(title, chan);
+
+    row.append(img, text);
+    row.onclick = () => pickSuggestion(item);
+    box.append(row);
+  });
+  box.classList.remove('hidden');
+}
+
+async function runSearch(q) {
+  if (!YT_API_KEY) {
+    showSuggestNote('Pencarian belum aktif: isi YT_API_KEY di kode.');
+    return;
+  }
+  const seq = ++suggestSeq;
+  showSuggestNote('Mencari...');
+  try {
+    const items = await searchYouTube(q);
+    if (seq === suggestSeq) renderSuggestions(items);
+  } catch (error) {
+    if (seq === suggestSeq) showSuggestNote('Pencarian gagal: ' + error.message);
+  }
+}
+
+function onSearchInput() {
+  clearTimeout(suggestTimer);
+  const q = $('youtubeUrl').value.trim();
+  // URL / ID video tidak perlu dicari
+  if (q.length < 3 || extractId(q)) {
+    suggestSeq++;
+    hideSuggest();
+    return;
+  }
+  suggestTimer = setTimeout(() => runSearch(q), 500);
+}
+
+function pickSuggestion(item) {
+  hideSuggest();
+  $('youtubeUrl').value = item.videoId;
+  $('songName').value = item.title;
+  addSong();
+}
+
+$('youtubeUrl').addEventListener('input', onSearchInput);
+document.addEventListener('click', event => {
+  if (!event.target.closest('.suggest-wrap')) hideSuggest();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') hideSuggest();
+});
 
 /* Kontrol dari HP (remote) */
 $('rStop').onclick = stopPlayback;
