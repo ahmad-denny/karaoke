@@ -495,16 +495,12 @@ function syncPlayer() {
     return;
   }
 
-  let currentVideoId = '';
-  try {
-    currentVideoId = player.getVideoData()?.video_id || '';
-  } catch (error) {}
-
-  if (currentVideoId !== song.videoId) {
+  // Pakai penanda sendiri, bukan getVideoData() yang belum siap saat loading
+  if (lastLoadedVideoId !== song.videoId) {
     loadCurrent(state.isPlaying);
     return;
   }
-
+  
   if (state.isPlaying) {
     player.playVideo();
   } else {
