@@ -36,6 +36,11 @@ main{
 }
 #ytplayer{width:100%;height:100%;min-height:100%}
 #ytplayer iframe{width:100%;height:100%;border:0;display:block}
+#ytError{
+  position:absolute;left:0;right:0;top:0;z-index:5;
+  padding:14px;text-align:center;font-weight:700;
+  background:#8e3045e6;pointer-events:none
+}
 .now{
   display:flex;justify-content:space-between;align-items:center;
   gap:10px;margin:14px 0
@@ -102,15 +107,17 @@ footer{text-align:center;color:#8491aa;font-size:11px;padding:15px}
 .sg-chan{font-size:11px;color:var(--muted);margin-top:2px}
 .sg-note{padding:12px;font-size:12px;color:var(--muted)}
 
-  /* Mode TV: panel pemutar di tengah & pas 1 layar (tanpa scrollbar) */
-body.mode-tv main{
-  /* 390px = tinggi header + judul + tombol + bantuan + footer + padding */
+/* Mode TV (sebelum video diputar): panel di tengah & pas 1 layar */
+body.mode-tv:not(.tv-theater){overflow:hidden}
+body.mode-tv:not(.tv-theater) main{
+  /* 390px = tinggi header + judul + tombol + bantuan + footer + padding.
+     Naikkan jika masih ada scrollbar, turunkan jika ada ruang kosong. */
   grid-template-columns:minmax(0,min(1100px,calc((100vh - 390px) * 16 / 9 + 34px)));
   justify-content:center;
   padding-top:12px;
   padding-bottom:0;
 }
-body.mode-tv{overflow:hidden}
+
 /* Mode teater TV: video memenuhi layar saat lagu diputar */
 body.tv-theater header,
 body.tv-theater footer{display:none}
@@ -147,26 +154,16 @@ body.tv-theater #tvHelp{display:none}
 <header>
   <div>
     <h1>🎤 KaraokeKu ver 1.0</h1>
-    <!--
-    <div class="sub">Laptop / TV sebagai pemutar • HP sebagai remote playlist</div>
-    -->
+    <div class="status" id="connection">Belum terhubung</div>
   </div>
-  <div class="status" id="connection">Belum terhubung</div>
 </header>
 
 <section class="setup panel" id="setup">
   <h2>Pengaturan koneksi</h2>
-  <!--
-  <p>Aplikasi memakai Firebase Realtime Database agar playlist laptop/TV dan HP tersinkronisasi. Gunakan file yang sama dari alamat hosting yang sama pada kedua perangkat.</p>
-  -->
   <div class="formrow">
     <input id="roomInput" placeholder="Kode ruang, contoh: keluarga01">
     <button class="primary" id="joinBtn">Masuk ruang</button>
   </div>
-  <!--
-  <p><b>Alamat TV:</b> <code>?mode=tv&amp;room=keluarga01</code><br>
-     <b>Alamat HP:</b> <code>?mode=remote&amp;room=keluarga01</code></p>
-  -->
   <div id="setupError" class="muted"></div>
 </section>
 
@@ -175,6 +172,7 @@ body.tv-theater #tvHelp{display:none}
     <div class="player-wrap">
       <!-- YouTube IFrame Player wajib memakai ID ytplayer -->
       <div id="ytplayer"></div>
+      <div id="ytError" class="hidden"></div>
     </div>
     <div class="now">
       <div>
@@ -236,10 +234,7 @@ body.tv-theater #tvHelp{display:none}
 </main>
 
 <button id="fsBtn" class="hidden" title="Layar penuh (F)">⛶</button>
-<!--
-<footer>Playlist dibagikan melalui Firebase Realtime Database • Pemutaran video mengikuti ketersediaan dan kebijakan YouTube.</footer>
--->
-<footer>Ver 1.0 • Pemutaran video mengikuti ketersediaan dan kebijakan YouTube.</footer>  
+<footer>Ver 1.0 • Pemutaran video mengikuti ketersediaan dan kebijakan YouTube.</footer>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -274,7 +269,6 @@ if (mode === 'tv') {
 } else {
   $('playerPanel').classList.add('hidden');
 }
-  
 if (params.get('room')) $('roomInput').value = params.get('room');
 
 function validConfig() {
@@ -495,12 +489,16 @@ function syncPlayer() {
     return;
   }
 
-  // Pakai penanda sendiri, bukan getVideoData() yang belum siap saat loading
-  if (lastLoadedVideoId !== song.videoId) {
+  let currentVideoId = '';
+  try {
+    currentVideoId = player.getVideoData()?.video_id || '';
+  } catch (error) {}
+
+  if (currentVideoId !== song.videoId) {
     loadCurrent(state.isPlaying);
     return;
   }
-  
+
   if (state.isPlaying) {
     player.playVideo();
   } else {
@@ -696,11 +694,27 @@ window.onYouTubeIframeAPIReady = function () {
         syncPlayer();
       },
       onStateChange: function (event) {
+        if (event.data === YT.PlayerState.PLAYING) $('ytError').classList.add('hidden');
         if (event.data === YT.PlayerState.ENDED) next();
       },
       onError: function (event) {
+        const pesan = {
+          2: 'ID video tidak valid',
+          5: 'Error pemutar HTML5',
+          100: 'Video tidak ditemukan atau privat',
+          101: 'Pemilik video melarang diputar di luar YouTube',
+          150: 'Pemilik video melarang diputar di luar YouTube'
+        }[event.data] || ('Kode error ' + event.data);
+
         console.error('YouTube Player error code:', event.data);
+        $('ytError').textContent = '⚠ ' + pesan;
+        $('ytError').classList.remove('hidden');
         $('connection').textContent = 'Error YouTube: ' + event.data;
+
+        // Lompat ke lagu berikutnya (hanya jika ada lebih dari 1 lagu)
+        if (state.playlist.length > 1) {
+          setTimeout(next, 4000);
+        }
       }
     }
   });
