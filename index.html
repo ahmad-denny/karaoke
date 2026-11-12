@@ -75,10 +75,10 @@ body.mode-remote main{grid-template-columns:minmax(0,640px);justify-content:cent
 body.mode-remote #remotePanel{width:100%}
 
 .add-toggle{
-  display:inline-block;color:#c9bbff;font-weight:750;font-size:15px;
-  text-decoration:none;padding:4px 2px;margin-bottom:10px
+  display:block;width:100%;margin-bottom:12px;
+  padding:12px;font-size:14px
 }
-.add-toggle:hover{text-decoration:underline}
+.add-toggle.open{background:var(--panel2)}
 #addBox{margin-bottom:12px}
 .addrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px}
 
@@ -219,7 +219,7 @@ body.tv-theater #tvHelp{display:none}
 
   <!-- ===== Panel remote (HP) ===== -->
   <section class="panel" id="remotePanel">
-    <a href="#" class="add-toggle" id="addToggle">＋ Tambah</a>
+    <button class="add-toggle primary" id="addToggle">＋ Tambah lagu ke Playlist</button>
 
     <div id="addBox" class="hidden">
       <div class="addrow">
@@ -765,16 +765,16 @@ $('youtubeUrl').addEventListener('keydown', event => {
 });
 
 /* Link "Tambah": tampilkan / sembunyikan form tambah lagu */
-$('addToggle').onclick = event => {
-  event.preventDefault();
+$('addToggle').onclick = () => {
   const box = $('addBox');
   const willShow = box.classList.contains('hidden');
   box.classList.toggle('hidden', !willShow);
-  $('addToggle').textContent = willShow ? '− Tutup' : '＋ Tambah';
+  $('addToggle').textContent = willShow ? '✕ Tutup' : '＋ Tambah lagu ke Playlist';
+  $('addToggle').classList.toggle('open', willShow);
   if (willShow) $('youtubeUrl').focus();
   else hideSuggest();
 };
-
+  
 $('filters').onclick = event => {
   const selected = event.target.dataset.filter;
   if (!selected) return;
