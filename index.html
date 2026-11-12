@@ -785,7 +785,7 @@ $('addToggle').onclick = () => {
   const box = $('addBox');
   const willShow = box.classList.contains('hidden');
   box.classList.toggle('hidden', !willShow);
-  $('addToggle').textContent = willShow ? '✕ Tutup' : '＋ Tambah lagu ke Playlist';
+  $('addToggle').textContent = willShow ? 'x Tutup' : '＋ Tambah lagu ke Playlist';
   $('addToggle').classList.toggle('open', willShow);
   if (willShow) $('youtubeUrl').focus();
   else hideSuggest();
