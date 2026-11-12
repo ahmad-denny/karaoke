@@ -112,11 +112,19 @@ body.mode-tv:not(.tv-theater){overflow:hidden}
 body.mode-tv:not(.tv-theater) main{
   /* 390px = tinggi header + judul + tombol + bantuan + footer + padding.
      Naikkan jika masih ada scrollbar, turunkan jika ada ruang kosong. */
-  grid-template-columns:minmax(0,min(1100px,calc((100vh - 390px) * 16 / 9 + 34px)));
+  grid-template-columns:minmax(0,min(1100px,calc((100vh - 250px) * 16 / 9 + 34px)));
   justify-content:center;
   padding-top:12px;
   padding-bottom:0;
 }
+
+/* Mode TV: tampilkan hanya judul lagu */
+body.mode-tv #playerPanel .now .muted,
+body.mode-tv #nowCategory,
+body.mode-tv #playerPanel .controls,
+body.mode-tv #tvHelp{display:none}
+
+body.mode-tv #playerPanel .now{justify-content:center;margin:12px 0 0}
 
 /* Mode teater TV: video memenuhi layar saat lagu diputar */
 body.tv-theater header,
