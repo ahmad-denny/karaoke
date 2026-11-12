@@ -8,7 +8,8 @@
 :root{
   --bg:#0b1020;--panel:#151d32;--panel2:#1d2943;
   --text:#f5f7ff;--muted:#aab5cc;--accent:#9b7cff;
-  --green:#32d296;--red:#ff647c
+  --green:#32d296;--red:#ff647c;
+  --h:32px
 }
 *{box-sizing:border-box}
 body{
@@ -75,23 +76,21 @@ body.mode-remote main{grid-template-columns:minmax(0,640px);justify-content:cent
 body.mode-remote #remotePanel{width:100%}
 
 .add-toggle{
-  display:block;width:100%;margin-bottom:12px;
-  padding:12px;font-size:14px
+  display:block;width:100%;margin-bottom:12px
 }
 .add-toggle.open{background:var(--panel2)}
 #addBox{margin-bottom:12px}
-.addrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px}
+.addrow{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px}
 
 .filters{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .filters button{padding:7px 10px;font-size:12px}
 .filters .active{background:var(--accent)}
 .filters #clearBtn{margin-left:auto;background:#8e3045}
-/* Tinggi seragam: tombol Tambah/Tutup, input, + Tambah, combobox, dan tab */
-:root{--h:32px}
+
+/* Tinggi seragam: tombol Tambah/Tutup, input, combobox, dan tab */
 .add-toggle,
 .filters button,
 #youtubeUrl,
-#addBtn,
 #songCategory{
   height:var(--h);
   padding:0 12px;
@@ -102,7 +101,7 @@ body.mode-remote #remotePanel{width:100%}
 /* Tab penuh selebar panel, tombol Hapus playlist di baris bawahnya */
 .filters button[data-filter]{flex:1}
 .filters #clearBtn{flex:0 0 100%;margin-left:0}
-  
+
 .song{
   display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;
   gap:6px 9px;padding:10px;border-radius:12px;background:#0e172b;
@@ -241,21 +240,20 @@ body.tv-theater #tvHelp{display:none}
     <div id="addBox" class="hidden">
       <div class="addrow">
         <div class="suggest-wrap">
-          <input id="youtubeUrl" placeholder="Ketik judul lagu, atau tempel URL / ID video" autocomplete="off">
+          <input id="youtubeUrl" placeholder="Ketik judul lagu, atau tempel URL / ID video lalu Enter" autocomplete="off">
           <div id="suggestions" class="hidden"></div>
         </div>
-        <button class="primary" id="addBtn">＋ Tambah</button>
       </div>
       <select id="songCategory">
         <option value="karaoke">Karaoke</option>
-        <option value="non-karaoke">Non-Karaoke</option>
+        <option value="non-karaoke">Non-karaoke</option>
       </select>
     </div>
 
     <div class="filters" id="filters">
       <button class="active" data-filter="all">Semua</button>
       <button data-filter="karaoke">Karaoke</button>
-      <button data-filter="non-karaoke">Non-Karaoke</button>
+      <button data-filter="non-karaoke">Non-karaoke</button>
       <button id="clearBtn">Hapus playlist</button>
     </div>
 
@@ -432,7 +430,7 @@ function render() {
   const current = state.playlist[state.currentIndex];
   $('nowTitle').textContent = current ? (current.title || 'YouTube ' + current.videoId) : 'Belum ada lagu';
   $('nowCategory').textContent = current
-    ? (current.category === 'karaoke' ? 'Karaoke' : 'Non-Karaoke')
+    ? (current.category === 'karaoke' ? 'Karaoke' : 'Non-karaoke')
     : '—';
 
   $('playlist').innerHTML = '';
@@ -679,11 +677,7 @@ async function addSong(preset) {
   }
 
   if (!title) {
-    $('addBtn').disabled = true;
-    $('addBtn').textContent = 'Mencari judul...';
     title = (await fetchTitle(videoId)) || '';
-    $('addBtn').disabled = false;
-    $('addBtn').textContent = '＋ Tambah';
   }
 
   const song = {
@@ -776,22 +770,21 @@ window.onYouTubeIframeAPIReady = function () {
 
 /* Event tombol dan filter */
 $('joinBtn').onclick = () => connect($('roomInput').value);
-$('addBtn').onclick = () => addSong();
 $('youtubeUrl').addEventListener('keydown', event => {
   if (event.key === 'Enter') addSong();
 });
 
-/* Link "Tambah": tampilkan / sembunyikan form tambah lagu */
+/* Tombol "Tambah lagu ke Playlist" / "Tutup": tampilkan atau sembunyikan form */
 $('addToggle').onclick = () => {
   const box = $('addBox');
   const willShow = box.classList.contains('hidden');
   box.classList.toggle('hidden', !willShow);
-  $('addToggle').textContent = willShow ? 'x Tutup' : '＋ Tambah lagu ke Playlist';
+  $('addToggle').textContent = willShow ? '✕ Tutup' : '＋ Tambah lagu ke Playlist';
   $('addToggle').classList.toggle('open', willShow);
   if (willShow) $('youtubeUrl').focus();
   else hideSuggest();
 };
-  
+
 $('filters').onclick = event => {
   const selected = event.target.dataset.filter;
   if (!selected) return;
