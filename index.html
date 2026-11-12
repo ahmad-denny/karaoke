@@ -99,6 +99,10 @@ body.mode-remote #remotePanel{width:100%}
   line-height:1
 }
 
+/* Tab penuh selebar panel, tombol Hapus playlist di baris bawahnya */
+.filters button[data-filter]{flex:1}
+.filters #clearBtn{flex:0 0 100%;margin-left:0}
+  
 .song{
   display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;
   gap:6px 9px;padding:10px;border-radius:12px;background:#0e172b;
