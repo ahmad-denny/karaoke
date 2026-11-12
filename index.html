@@ -247,14 +247,14 @@ body.tv-theater #tvHelp{display:none}
       </div>
       <select id="songCategory">
         <option value="karaoke">Karaoke</option>
-        <option value="non-karaoke">Non-karaoke</option>
+        <option value="non-karaoke">Non-Karaoke</option>
       </select>
     </div>
 
     <div class="filters" id="filters">
       <button class="active" data-filter="all">Semua</button>
       <button data-filter="karaoke">Karaoke</button>
-      <button data-filter="non-karaoke">Non-karaoke</button>
+      <button data-filter="non-karaoke">Non-Karaoke</button>
       <button id="clearBtn">Hapus playlist</button>
     </div>
 
@@ -431,7 +431,7 @@ function render() {
   const current = state.playlist[state.currentIndex];
   $('nowTitle').textContent = current ? (current.title || 'YouTube ' + current.videoId) : 'Belum ada lagu';
   $('nowCategory').textContent = current
-    ? (current.category === 'karaoke' ? 'Karaoke' : 'Non-karaoke')
+    ? (current.category === 'karaoke' ? 'Karaoke' : 'Non-Karaoke')
     : '—';
 
   $('playlist').innerHTML = '';
