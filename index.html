@@ -37,6 +37,11 @@ main{
 }
 #ytplayer{width:100%;height:100%;min-height:100%}
 #ytplayer iframe{width:100%;height:100%;border:0;display:block}
+#tvStart{
+  position:absolute;inset:0;z-index:6;display:flex;
+  align-items:center;justify-content:center;text-align:center;
+  padding:20px;background:#000c;font-size:22px;font-weight:700;cursor:pointer
+}
 #ytError{
   position:absolute;left:0;right:0;top:0;z-index:5;
   padding:14px;text-align:center;font-weight:700;
@@ -64,11 +69,10 @@ input,select{
 .formrow{display:grid;grid-template-columns:1fr 145px;gap:8px;margin:10px 0}
 .tag{font-size:10px;border-radius:20px;padding:3px 7px;background:#3a315d;color:#d9ceff}
 .status{font-size:12px;color:var(--muted);padding:8px 0}
-/*.status{font-size:12px;color:var(--muted);padding:8px 10px;background:#0c1427;border-radius:9px}*/
-.status.off{color:#ffb454}   /* belum terhubung */
-.status.wait{color:#ffd966}  /* menghubungkan */
+.status.off{color:#ffb454}
+.status.wait{color:#ffd966}
 .status.on{color:var(--green)}
-.status.err{color:var(--red)}  
+.status.err{color:var(--red)}
 .setup{
   max-width:850px;width:calc(100% - 24px);
   margin:22px auto;padding:18px
@@ -240,6 +244,7 @@ body.tv-theater #tvHelp{display:none}
       <!-- YouTube IFrame Player wajib memakai ID ytplayer -->
       <div id="ytplayer"></div>
       <div id="ytError" class="hidden"></div>
+      <div id="tvStart" class="hidden">▶ Tekan OK / klik layar untuk memulai</div>
     </div>
     <div class="now">
       <div>
@@ -310,6 +315,7 @@ let ytReady = false;
 let filter = 'all';
 let state = { playlist: [], currentIndex: -1, isPlaying: false };
 let lastLoadedVideoId = null;
+let tvUnlocked = false;
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -358,15 +364,15 @@ function extractId(raw) {
   return null;
 }
 
-function showError(message) {
-  $('setupError').textContent = message;
-  console.error(message);
-}
-
 function setStatus(text, type) {
   const el = $('connection');
   el.textContent = text;
   el.className = 'status ' + type;
+}
+
+function showError(message) {
+  $('setupError').textContent = message;
+  console.error(message);
 }
 
 async function connect(room) {
@@ -453,8 +459,9 @@ function render() {
   if (mode === 'tv') {
     document.body.classList.toggle(
       'tv-theater',
-      state.isPlaying && state.currentIndex >= 0
+      tvUnlocked && state.isPlaying && state.currentIndex >= 0
     );
+    $('tvStart').classList.toggle('hidden', tvUnlocked);
   }
 
   const current = state.playlist[state.currentIndex];
@@ -545,7 +552,7 @@ function loadCurrent(autoplay = true) {
 }
 
 function syncPlayer() {
-  if (mode !== 'tv' || !player || !ytReady) return;
+  if (mode !== 'tv' || !player || !ytReady || !tvUnlocked) return;
 
   const song = state.playlist[state.currentIndex];
 
@@ -836,6 +843,7 @@ $('playBtn').onclick = () => {
     state.currentIndex = 0;
   }
 
+  tvUnlocked = true;
   state.isPlaying = true;
   render();
 
@@ -1001,12 +1009,16 @@ if (mode === 'tv') {
   document.addEventListener('keydown', e => {
     if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   });
-  // Klik pertama di mana saja (selain iframe) langsung masuk fullscreen
-  document.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
-    }
-  }, { once: true });
+  // Klik / tombol pertama: buka kunci autoplay, layar penuh, lalu putar lagu
+  function unlockTv() {
+    if (tvUnlocked) return;
+    tvUnlocked = true;
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    render();
+    syncPlayer();
+  }
+  document.addEventListener('click', unlockTv, { once: true });
+  document.addEventListener('keydown', unlockTv, { once: true });
 }
 
 if (params.get('room')) connect(params.get('room'));
