@@ -211,6 +211,13 @@ body.tv-theater #tvHelp{display:none}
 }
 #fsBtn:hover{opacity:1}
 
+/* Panel diagnosa (hanya muncul jika alamat memakai &debug=1) */
+#dbg{
+  position:fixed;left:8px;top:8px;z-index:100;white-space:pre;
+  background:#000b;color:#4dff88;font:14px monospace;
+  padding:6px 8px;border-radius:6px;pointer-events:none
+}
+
 @media(max-width:850px){
   main{grid-template-columns:1fr;padding:12px}
   .panel{padding:13px}
@@ -291,6 +298,7 @@ body.tv-theater #tvHelp{display:none}
 </main>
 
 <button id="fsBtn" class="hidden" title="Layar penuh (F)">⛶</button>
+<div id="dbg" class="hidden"></div>
 <footer>Ver 1.0 • Pemutaran video mengikuti ketersediaan dan kebijakan YouTube.</footer>
 
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -1019,6 +1027,20 @@ if (mode === 'tv') {
   }
   document.addEventListener('click', unlockTv, { once: true });
   document.addEventListener('keydown', unlockTv, { once: true });
+}
+
+/* Diagnosa: buka alamat dengan &debug=1 */
+if (params.get('debug') === '1') {
+  setInterval(() => {
+    let ps = '-';
+    try { ps = player && ytReady ? player.getPlayerState() : 'belum siap'; } catch (e) {}
+    const el = $('dbg');
+    el.classList.remove('hidden');
+    el.textContent =
+      'ytReady=' + ytReady + '  unlocked=' + tvUnlocked +
+      '\nplaying=' + state.isPlaying + '  idx=' + state.currentIndex +
+      '\nplayerState=' + ps;
+  }, 1000);
 }
 
 if (params.get('room')) connect(params.get('room'));
