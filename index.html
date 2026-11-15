@@ -307,6 +307,27 @@ body.tv-theater #tvHelp{display:none}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
 <script>
+/* Cek pembaruan: jika browser memakai HTML lama dari cache, muat ulang otomatis.
+   (JavaScript tidak bisa menghapus cache browser, tapi bisa mendeteksi file usang.) */
+(async function checkFresh() {
+  const u = new URL(location.href);
+  if (u.searchParams.has('_r')) {          // baru saja dimuat ulang: rapikan alamat
+    u.searchParams.delete('_r');
+    history.replaceState(null, '', u.toString());
+    return;
+  }
+  try {
+    const [cached, fresh] = await Promise.all([
+      fetch(location.href, { cache: 'force-cache' }).then(r => r.text()),
+      fetch(location.href, { cache: 'reload' }).then(r => r.text())   // ambil terbaru & perbarui cache
+    ]);
+    if (cached !== fresh) {
+      u.searchParams.set('_r', Date.now());
+      location.replace(u.toString());
+    }
+  } catch (error) {}
+})();
+
 /* Konfigurasi Firebase milik Anda */
 const firebaseConfig = {
   apiKey: "AIzaSyDQg-1Ga5mrBh1rXAdd94i1ajGQXuzksKE",
