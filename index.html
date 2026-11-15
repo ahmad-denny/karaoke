@@ -199,7 +199,7 @@ body.tv-theater #playerPanel{
   border:0;border-radius:0;background:#000;box-shadow:none
 }
 body.tv-theater .player-wrap{
-  position:absolute;inset:0;aspect-ratio:auto;border-radius:0
+  position:absolute;inset:0;aspect-ratio:auto;border-radius:0;overflow:visible
 }
 body.tv-theater .now,
 body.tv-theater .controls,
@@ -787,7 +787,10 @@ window.onYouTubeIframeAPIReady = function () {
         syncPlayer();
       },
       onStateChange: function (event) {
-        if (event.data === YT.PlayerState.PLAYING) $('ytError').classList.add('hidden');
+        if (event.data === YT.PlayerState.PLAYING) {
+          $('ytError').classList.add('hidden');
+          try { if (player.isMuted()) player.unMute(); player.setVolume(100); } catch (e) {}
+        }
         if (event.data === YT.PlayerState.ENDED) next();
       },
       onError: function (event) {
@@ -1032,14 +1035,27 @@ if (mode === 'tv') {
 /* Diagnosa: buka alamat dengan &debug=1 */
 if (params.get('debug') === '1') {
   setInterval(() => {
-    let ps = '-';
-    try { ps = player && ytReady ? player.getPlayerState() : 'belum siap'; } catch (e) {}
+    let ps = '-', t = '-', mu = '-', vol = '-', q = '-';
+    try {
+      if (player && ytReady) {
+        ps = player.getPlayerState();
+        t = player.getCurrentTime().toFixed(1);
+        mu = player.isMuted();
+        vol = player.getVolume();
+        q = player.getPlaybackQuality();
+      }
+    } catch (e) {}
+    const f = document.getElementById('ytplayer');
+    const r = f ? f.getBoundingClientRect() : null;
     const el = $('dbg');
     el.classList.remove('hidden');
     el.textContent =
       'ytReady=' + ytReady + '  unlocked=' + tvUnlocked +
       '\nplaying=' + state.isPlaying + '  idx=' + state.currentIndex +
-      '\nplayerState=' + ps;
+      '\nplayerState=' + ps + '  t=' + t + 's' +
+      '\nmute=' + mu + '  vol=' + vol + '  q=' + q +
+      '\nsize=' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : '-') +
+      '  theater=' + document.body.classList.contains('tv-theater');
   }, 1000);
 }
 
