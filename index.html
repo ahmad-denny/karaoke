@@ -355,6 +355,11 @@ let state = { playlist: [], currentIndex: -1, isPlaying: false };
 let lastLoadedVideoId = null;
 let tvUnlocked = false;
 
+/* Kualitas video di TV: small=240p, medium=360p, large=480p, hd720=720p, hd1080=1080p
+   (YouTube boleh mengabaikan permintaan ini; cek hasilnya lewat &debug=1 → q=) */
+const PREFERRED_QUALITY = 'large';
+let qualityAppliedFor = null;
+
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const mode = params.get('mode') === 'tv' ? 'tv' : 'remote';
@@ -582,11 +587,24 @@ function loadCurrent(autoplay = true) {
 
   lastLoadedVideoId = song.videoId;
 
+  qualityAppliedFor = null;
   if (autoplay) {
-    player.loadVideoById(song.videoId);
+    player.loadVideoById({ videoId: song.videoId, suggestedQuality: PREFERRED_QUALITY });
   } else {
-    player.cueVideoById(song.videoId);
+    player.cueVideoById({ videoId: song.videoId, suggestedQuality: PREFERRED_QUALITY });
   }
+}
+
+/* Minta kualitas tetap, cukup sekali per video agar tidak memicu buffering berulang */
+function forceQuality() {
+  if (!player || !ytReady || qualityAppliedFor === lastLoadedVideoId) return;
+  qualityAppliedFor = lastLoadedVideoId;
+  try {
+    if (player.setPlaybackQualityRange) {
+      player.setPlaybackQualityRange(PREFERRED_QUALITY, PREFERRED_QUALITY);
+    }
+    player.setPlaybackQuality(PREFERRED_QUALITY);
+  } catch (e) {}
 }
 
 function syncPlayer() {
@@ -820,6 +838,7 @@ window.onYouTubeIframeAPIReady = function () {
         if (event.data === YT.PlayerState.PLAYING) {
           $('ytError').classList.add('hidden');
           try { if (player.isMuted()) player.unMute(); player.setVolume(100); } catch (e) {}
+          forceQuality();
         }
         if (event.data === YT.PlayerState.ENDED) next();
       },
