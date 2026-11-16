@@ -211,6 +211,14 @@ body.tv-theater #tvHelp{display:none}
 }
 #fsBtn:hover{opacity:1}
 
+/* Titik kecil berkedip di mode TV: memaksa layar digambar ulang tiap detik
+   (menghindari video hitam di sebagian WebView Android TV) */
+#tvDot{
+  position:fixed;left:8px;top:8px;z-index:100;width:6px;height:6px;
+  border-radius:50%;background:#fff;opacity:.15;pointer-events:none
+}
+#tvDot.on{opacity:.5}
+
 /* Panel diagnosa (hanya muncul jika alamat memakai &debug=1) */
 #dbg{
   position:fixed;left:8px;top:8px;z-index:100;white-space:pre;
@@ -299,6 +307,7 @@ body.tv-theater #tvHelp{display:none}
 
 <button id="fsBtn" class="hidden" title="Layar penuh (F)">⛶</button>
 <div id="dbg" class="hidden"></div>
+<div id="tvDot" class="hidden"></div>
 <footer>Ver 1.0 • Pemutaran video mengikuti ketersediaan dan kebijakan YouTube.</footer>
 
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -1051,6 +1060,25 @@ if (mode === 'tv') {
   }
   document.addEventListener('click', unlockTv, { once: true });
   document.addEventListener('keydown', unlockTv, { once: true });
+}
+
+/* Mode TV: "detak" tiap detik (sama seperti yang dilakukan panel debug) */
+if (mode === 'tv') {
+  $('tvDot').classList.remove('hidden');
+  setInterval(() => {
+    try {
+      if (player && ytReady) {
+        player.getPlayerState();
+        player.getCurrentTime();
+        player.isMuted();
+        player.getVolume();
+        player.getPlaybackQuality();
+      }
+    } catch (e) {}
+    const f = document.getElementById('ytplayer');
+    if (f) f.getBoundingClientRect();
+    $('tvDot').classList.toggle('on');
+  }, 1000);
 }
 
 /* Diagnosa: buka alamat dengan &debug=1 */
