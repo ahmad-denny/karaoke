@@ -119,7 +119,7 @@ body.mode-remote #remotePanel{width:100%}
 .filters #clearBtn{flex:0 0 100%;margin-left:0}
 
 .song{
-  display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;
+  display:grid;grid-template-columns:84px minmax(0,1fr) auto;align-items:center;
   gap:6px 9px;padding:10px;border-radius:12px;background:#0e172b;
   margin:7px 0;border:1px solid #ffffff0d
 }
@@ -129,6 +129,16 @@ body.mode-remote #remotePanel{width:100%}
 }
 .song.current .num{color:var(--green)}
 .num{color:var(--muted);font-weight:800;text-align:center}
+.song-thumb{
+  position:relative;width:84px;aspect-ratio:16/9;border-radius:8px;
+  overflow:hidden;background:#000
+}
+.song-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.song-thumb .num{
+  position:absolute;left:0;top:0;min-width:20px;padding:1px 6px;
+  background:#000b;color:#fff;font-size:11px;border-radius:0 0 8px 0
+}
+.song.current .song-thumb .num{background:var(--green);color:#06281c}
 .song-title{
   font-weight:700;overflow-wrap:anywhere;line-height:1.3;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
@@ -136,7 +146,7 @@ body.mode-remote #remotePanel{width:100%}
 .song-actions{display:grid;grid-template-columns:auto auto;gap:4px}
 .song-actions button{padding:7px 10px;font-size:12px}
 .song-now{
-  grid-column:2 / 4;display:flex;align-items:center;gap:6px;flex-wrap:wrap
+  grid-column:1 / 4;display:flex;align-items:center;gap:6px;flex-wrap:wrap
 }
 .song-now button{padding:7px 12px;font-size:12px}
 .song-now .tag{background:#1d5a47;color:#b9ffe3}
@@ -167,7 +177,8 @@ body.mode-remote #remotePanel{width:100%}
 .sg-note{padding:12px;font-size:12px;color:var(--muted)}
 
 /* Latar belakang mode remote (gambar tertanam, lapisan gelap agar teks tetap terbaca) */
-body.mode-remote::before{
+body.mode-remote::before,
+body.mode-tv::before{
   content:"";position:fixed;inset:0;z-index:-1;
   background:
     linear-gradient(rgba(9,14,28,.55),rgba(9,14,28,.8)),
@@ -177,6 +188,10 @@ body.mode-remote .panel{
   background:#151d32cc;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)
 }
+/* TV: panel semi-transparan tanpa blur (lebih ringan untuk perangkat TV) */
+body.mode-tv:not(.tv-theater) .panel{background:#151d32cc}
+/* Saat video diputar layar penuh, latar tidak perlu digambar */
+body.tv-theater::before{display:none}
 
 /* Mode TV: tampilkan hanya judul lagu */
 body.mode-tv #playerPanel .now .muted,
@@ -579,7 +594,17 @@ function render() {
       );
     }
 
-    item.append(number, title, actions);
+    // Thumbnail video dengan nomor urut di pojok kiri atas
+    const thumb = document.createElement('div');
+    thumb.className = 'song-thumb';
+    const img = document.createElement('img');
+    img.src = 'https://i.ytimg.com/vi/' + song.videoId + '/mqdefault.jpg';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.onerror = () => img.remove();
+    thumb.append(img, number);
+
+    item.append(thumb, title, actions);
 
     // Jeda & Stop hanya muncul di lagu yang sedang diputar
     if (isCurrent) {
