@@ -146,11 +146,18 @@ body.mode-remote #remotePanel{width:100%}
 .song-actions{display:grid;grid-template-columns:auto auto;gap:4px}
 .song-actions button{padding:7px 10px;font-size:12px}
 .song-now{
-  grid-column:1 / 4;display:flex;align-items:center;gap:6px;flex-wrap:wrap
+  grid-column:1 / 4;display:grid;grid-template-columns:repeat(3,1fr);gap:6px
 }
 .song-now button{padding:7px 12px;font-size:12px}
 .song-now .tag{background:#1d5a47;color:#b9ffe3}
 .song-now .tag{font-size:12px;font-weight:650;padding:6px 10px}
+/* Label status, Jeda/Lanjut, dan Stop: lebar & tinggi sama */
+.song-now button,
+.song-now .tag{
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  min-height:var(--h);padding:4px 6px;border-radius:10px;
+  font-size:12px;font-weight:650;line-height:1.15
+}
 
 /* Hasil pencarian YouTube saat mengetik */
 .suggest-wrap{position:relative;min-width:0}
