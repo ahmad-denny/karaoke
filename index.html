@@ -146,6 +146,14 @@ body.mode-remote #remotePanel{width:100%}
 .empty{text-align:center;font-size:12px;margin:16px 0}
 .song-actions{display:grid;grid-template-columns:auto auto;gap:4px}
 .song-actions button{padding:7px 10px;font-size:12px}
+.song-progress{
+  grid-column:1 / 4;display:grid;grid-template-columns:auto 1fr auto;
+  align-items:center;gap:8px;font-size:11px;color:var(--muted)
+}
+.pg-time{font-variant-numeric:tabular-nums;min-width:34px}
+.pg-dur{text-align:right}
+.pg-bar{height:6px;border-radius:3px;background:#ffffff26;overflow:hidden}
+.pg-fill{height:100%;width:0;background:var(--green);transition:width 1s linear}
 .song-now{
   grid-column:1 / 4;display:grid;grid-template-columns:repeat(3,1fr);gap:6px
 }
@@ -384,6 +392,8 @@ let filter = 'all';
 let state = { playlist: [], currentIndex: -1, isPlaying: false };
 let lastLoadedVideoId = null;
 let tvUnlocked = false;
+let progress = null;        // progres lagu dari TV: { v, t, d, p, recv }
+let lastStateSig = null;    // penanda perubahan playlist/index/isPlaying
 
 /* Kualitas video di TV: small=240p, medium=360p, large=480p, hd720=720p, hd1080=1080p
    (YouTube boleh mengabaikan permintaan ini; cek hasilnya lewat &debug=1 → q=) */
@@ -492,9 +502,32 @@ async function connect(room) {
         state.isPlaying = false;
       }
 
-      render();
-      if (mode === 'tv') syncPlayer();
-      if (mode === 'remote') fixTitles();
+      // Progres lagu (ditulis oleh TV): simpan waktu terimanya untuk interpolasi
+      const pr = data && data.progress;
+      if (pr && pr.v && Number(pr.d) > 0) {
+        if (!progress || progress.v !== pr.v || progress.t !== pr.t ||
+            progress.d !== pr.d || progress.p !== (pr.p ? 1 : 0)) {
+          progress = {
+            v: pr.v, t: Number(pr.t) || 0, d: Number(pr.d) || 0,
+            p: pr.p ? 1 : 0, recv: Date.now()
+          };
+        }
+      } else {
+        progress = null;
+      }
+
+      // Hanya gambar ulang bila playlist / index / status putar berubah
+      const sig = JSON.stringify([state.playlist, state.currentIndex, state.isPlaying]);
+      const changed = sig !== lastStateSig;
+      lastStateSig = sig;
+
+      if (changed) {
+        render();
+        if (mode === 'tv') syncPlayer();
+        if (mode === 'remote') fixTitles();
+      } else {
+        updateProgressUI();
+      }
 
       $('setup').classList.add('hidden');
       $('app').classList.remove('hidden');
@@ -516,7 +549,7 @@ function save() {
     return Promise.reject(new Error('roomRef belum tersedia'));
   }
 
-  return roomRef.set({
+  return roomRef.update({
     playlist: state.playlist,
     currentIndex: state.currentIndex,
     isPlaying: state.isPlaying
@@ -628,12 +661,64 @@ function render() {
         makeButton(state.isPlaying ? '⏸ Pause' : '▶ Resume', togglePause),
         makeButton('■ Stop', stopSong, 'danger')
       );
-      item.append(now);
+      item.append(buildProgress(), now);
     }
 
     $('playlist').append(item);
   });
+
+  updateProgressUI();
 }
+
+/* ===== Progres lagu (remote) ===== */
+function fmtTime(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const ss = String(sec % 60).padStart(2, '0');
+  return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss;
+}
+
+function currentProgress() {
+  const song = state.playlist[state.currentIndex];
+  if (!song || !progress || progress.v !== song.videoId || !progress.d) return null;
+  let t = progress.t;
+  if (progress.p && state.isPlaying) t += (Date.now() - progress.recv) / 1000;
+  return { t: Math.max(0, Math.min(t, progress.d)), d: progress.d };
+}
+
+function buildProgress() {
+  const box = document.createElement('div');
+  box.className = 'song-progress';
+
+  const cur = document.createElement('span');
+  cur.className = 'pg-time pg-cur';
+  cur.textContent = '0:00';
+
+  const bar = document.createElement('div');
+  bar.className = 'pg-bar';
+  const fill = document.createElement('div');
+  fill.className = 'pg-fill';
+  bar.append(fill);
+
+  const dur = document.createElement('span');
+  dur.className = 'pg-time pg-dur';
+  dur.textContent = '--:--';
+
+  box.append(cur, bar, dur);
+  return box;
+}
+
+function updateProgressUI() {
+  if (mode !== 'remote') return;
+  const box = document.querySelector('#playlist .song-progress');
+  if (!box) return;
+  const p = currentProgress();
+  box.querySelector('.pg-fill').style.width = (p ? (p.t / p.d) * 100 : 0) + '%';
+  box.querySelector('.pg-cur').textContent = fmtTime(p ? p.t : 0);
+  box.querySelector('.pg-dur').textContent = p ? fmtTime(p.d) : '--:--';
+}
+if (mode === 'remote') setInterval(updateProgressUI, 1000);
 
 function loadCurrent(autoplay = true) {
   if (mode !== 'tv' || !player || !ytReady) return;
@@ -661,6 +746,40 @@ function forceQuality() {
     }
     player.setPlaybackQuality(PREFERRED_QUALITY);
   } catch (e) {}
+}
+
+/* TV: kirim posisi putar ke Firebase (dibaca remote), maksimal tiap ~2,5 detik */
+let lastProgressSent = 0;
+let lastProgressKey = '';
+function pushProgress(force) {
+  if (mode !== 'tv' || !player || !ytReady || !roomRef || !tvUnlocked) return;
+  const song = state.playlist[state.currentIndex];
+  if (!song) return;
+
+  let ps, t, d, vid;
+  try {
+    ps = player.getPlayerState();
+    t = player.getCurrentTime();
+    d = player.getDuration();
+    vid = player.getVideoData && player.getVideoData().video_id;
+  } catch (e) { return; }
+
+  if (ps !== 1 && ps !== 2 && ps !== 3) return;    // diputar / jeda / buffering
+  if (!d || d <= 0) return;
+  if (vid && vid !== song.videoId) return;         // video lama belum berganti
+
+  const now = Date.now();
+  if (now - lastProgressSent < (force ? 500 : 2500)) return;
+
+  const data = { v: song.videoId, t: Math.floor(t), d: Math.floor(d), p: ps === 1 ? 1 : 0 };
+  const key = data.v + '|' + data.p + '|' + (data.p ? '' : data.t);
+  if (!force && !data.p && key === lastProgressKey) return;   // jeda & tidak berubah
+
+  lastProgressKey = key;
+  lastProgressSent = now;
+  roomRef.child('progress').set(data).catch(error => {
+    console.warn('Progress tidak terkirim:', error.message);
+  });
 }
 
 function syncPlayer() {
@@ -897,6 +1016,7 @@ window.onYouTubeIframeAPIReady = function () {
           forceQuality();
         }
         if (event.data === YT.PlayerState.ENDED) next();
+        pushProgress(true);
       },
       onError: function (event) {
         const pesan = {
@@ -1209,6 +1329,7 @@ if (mode === 'tv') {
     const f = document.getElementById('ytplayer');
     if (f) f.getBoundingClientRect();
     $('tvDot').classList.toggle('on');
+    pushProgress(false);
   }, 1000);
 }
 
