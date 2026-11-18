@@ -620,11 +620,11 @@ function render() {
 
       const label = document.createElement('span');
       label.className = 'tag';
-      label.textContent = state.isPlaying ? '● Sedang diputar' : '⏸ Dijeda';
+      label.textContent = state.isPlaying ? '● Now playing' : '⏸ Paused';
 
       now.append(
         label,
-        makeButton(state.isPlaying ? '⏸ Jeda' : '▶ Lanjut', togglePause),
+        makeButton(state.isPlaying ? '⏸ Pause' : '▶ Resume', togglePause),
         makeButton('■ Stop', stopSong, 'danger')
       );
       item.append(now);
