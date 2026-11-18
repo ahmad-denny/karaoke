@@ -143,6 +143,7 @@ body.mode-remote #remotePanel{width:100%}
   font-weight:700;overflow-wrap:anywhere;line-height:1.3;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
 }
+.empty{text-align:center;font-size:12px;margin:16px 0}
 .song-actions{display:grid;grid-template-columns:auto auto;gap:4px}
 .song-actions button{padding:7px 10px;font-size:12px}
 .song-now{
@@ -549,7 +550,7 @@ function render() {
     .filter(song => filter === 'all' || song.category === filter);
 
   if (!shown.length) {
-    $('playlist').innerHTML = '<p class="muted">Belum ada lagu pada kategori ini.</p>';
+    $('playlist').innerHTML = '<p class="muted empty">Belum ada lagu pada kategori ini.</p>';
     return;
   }
 
