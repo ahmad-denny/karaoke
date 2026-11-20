@@ -318,7 +318,7 @@ body.tv-theater #tvHelp{display:none}
 <section class="setup panel" id="setup">
   <h2>Pengaturan koneksi</h2>
   <div class="formrow">
-    <input id="roomInput" autofocus>
+    <input id="roomInput" placeholder="Kode ruang, contoh: keluarga01">
     <button class="primary" id="joinBtn">Masuk ruang</button>
   </div>
   <label class="opt">
@@ -1104,6 +1104,11 @@ window.onYouTubeIframeAPIReady = function () {
 
 /* Event tombol dan filter */
 $('joinBtn').onclick = () => connect($('roomInput').value);
+$('roomInput').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    connect($('roomInput').value);      // sama dengan klik "Masuk ruang" (kosong → pesan wajib diisi)
+  }
+});
 $('youtubeUrl').addEventListener('keydown', event => {
   if (event.key === 'Enter') addSong();
 });
