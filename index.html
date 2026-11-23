@@ -883,6 +883,35 @@ function playIndex(index) {
   }).catch(() => {});
 }
 
+/* TV: lagu yang selesai diputar otomatis dihapus dari playlist, lalu lanjut ke lagu berikutnya */
+let finishing = false;
+function finishSong() {
+  if (finishing) return;
+  const index = state.currentIndex;
+  const song = state.playlist[index];
+  if (!song) return;
+
+  // Pastikan yang selesai memang lagu aktif (bukan video lama)
+  let endedId = '';
+  try { endedId = player.getVideoData()?.video_id || ''; } catch (e) {}
+  if (endedId && endedId !== song.videoId) return;
+
+  finishing = true;
+  state.playlist.splice(index, 1);
+
+  if (!state.playlist.length) {              // antrean habis: berhenti
+    state.currentIndex = -1;
+    state.isPlaying = false;
+    lastLoadedVideoId = null;
+  } else {                                   // lagu berikutnya menempati index yang sama
+    state.currentIndex = index < state.playlist.length ? index : 0;
+    state.isPlaying = true;
+  }
+
+  render();
+  save().then(() => syncPlayer()).catch(() => {}).finally(() => { finishing = false; });
+}
+
 function next() {
   if (!state.playlist.length) return;
   const nextIndex = state.currentIndex < 0
@@ -1076,7 +1105,7 @@ window.onYouTubeIframeAPIReady = function () {
           try { if (player.isMuted()) player.unMute(); player.setVolume(100); } catch (e) {}
           forceQuality();
         }
-        if (event.data === YT.PlayerState.ENDED) next();
+        if (event.data === YT.PlayerState.ENDED) finishSong();
         pushProgress(true);
       },
       onError: function (event) {
