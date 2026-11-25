@@ -209,6 +209,14 @@ body.mode-tv:not(.tv-theater) .panel{background:#151d32cc}
 /* Saat video diputar layar penuh, latar tidak perlu digambar */
 body.tv-theater::before{display:none}
 
+/* Menu pilihan mode (TV / Remote) */
+#chooser{text-align:center}
+.mode-btn{
+  display:block;width:100%;height:auto;margin-top:10px;
+  padding:16px;font-size:18px;border-radius:14px
+}
+.mode-btn small{display:block;margin-top:4px;font-size:12px;font-weight:500;opacity:.85}
+
 /* Tombol pilihan (switch) di layar pengaturan */
 .opt{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -314,6 +322,14 @@ body.tv-theater #tvHelp{display:none}
     <div class="status off" id="connection">● Belum terhubung</div>
   </div>
 </header>
+
+<section class="setup panel hidden" id="chooser">
+  <h2>Pilih mode</h2>
+  <button class="primary mode-btn" data-mode="tv">📺 TV
+    <small>Layar utama untuk memutar video</small></button>
+  <button class="primary mode-btn" data-mode="remote">📱 Remote
+    <small>Atur playlist dari HP</small></button>
+</section>
 
 <section class="setup panel" id="setup">
   <h2>Pengaturan koneksi</h2>
@@ -441,7 +457,9 @@ let qualityAppliedFor = null;
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-const mode = params.get('mode') === 'tv' ? 'tv' : 'remote';
+const modeParam = params.get('mode');
+const needChoose = modeParam !== 'tv' && modeParam !== 'remote';   // alamat tanpa ?mode=
+const mode = modeParam === 'tv' ? 'tv' : 'remote';
 
 if (mode === 'tv') {
   $('remotePanel').classList.add('hidden');
@@ -451,6 +469,19 @@ if (mode === 'tv') {
   document.body.classList.add('mode-remote');
 }
 if (params.get('room')) $('roomInput').value = params.get('room');
+
+/* Tanpa ?mode=... → tampilkan menu pilihan TV / Remote dulu */
+if (needChoose) {
+  $('setup').classList.add('hidden');
+  $('chooser').classList.remove('hidden');
+  document.querySelectorAll('#chooser [data-mode]').forEach(button => {
+    button.onclick = () => {
+      const url = new URL(location.href);
+      url.searchParams.set('mode', button.dataset.mode);   // &room=, &glass= tetap dibawa
+      location.href = url.toString();
+    };
+  });
+}
 
 /* Glassmorphism mode (hanya remote): pilihan diingat di browser. Bisa juga lewat alamat: &glass=1 / &glass=0 */
 (function initGlass() {
@@ -1455,7 +1486,7 @@ if (params.get('debug') === '1') {
   }, 1000);
 }
 
-if (params.get('room')) connect(params.get('room'));
+if (params.get('room') && !needChoose) connect(params.get('room'));
 </script>
 </body>
 </html>
